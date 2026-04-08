@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solaris — Simulateur de Combat</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #1e1a26;
+    --bg2:     #252030;
+    --surface: #302a3e;
+    --sur2:    #3a3348;
+    --border:  #4a3f60;
+    --bord2:   #6a5880;
+    --gold:    #d4aa50;
+    --gold2:   #f0cc78;
+    --gold3:   #9a7428;
+    --goldd:   #7a5a1c;
+    --crim:    #a0253a;
+    --crim2:   #c8304a;
+    --crimd:   #5a1020;
+    --text:    #e8dcc8;
+    --text2:   #b8a890;
+    --text3:   #7a6a58;
+    --green:   #5aaa48;
+    --green2:  #78cc60;
+    --red:     #c83348;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',serif;font-size:15px;min-height:100vh;
+    background-image:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(160,37,58,.10) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 70% at 90% 90%,rgba(212,170,80,.07) 0%,transparent 50%)}
+
+  /* HEADER */
+  header{display:flex;align-items:center;gap:18px;padding:13px 26px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#16121e 0%,#1a1622 100%);position:sticky;top:0;z-index:200}
+  .logo-img{width:46px;height:46px;border-radius:8px;filter:drop-shadow(0 0 10px rgba(212,170,80,.35))}
+  .logo-text{font-family:'Cinzel',serif;font-weight:900;font-size:24px;letter-spacing:6px;color:var(--gold2);
+    text-shadow:0 0 24px rgba(212,170,80,.25)}
+  .logo-sub{font-family:'Cinzel',serif;font-size:9px;letter-spacing:3px;color:var(--text3);margin-top:2px}
+  .hdr-right{margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);text-align:right;line-height:2}
+  .gold-sep{height:1px;background:linear-gradient(90deg,transparent,var(--gold3),var(--gold),var(--gold3),transparent);opacity:.6}
+
+  /* LAYOUT */
+  .main{max-width:1400px;margin:0 auto;padding:18px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+  /* PANELS */
+  .panel{background:linear-gradient(155deg,#302840 0%,#251f32 100%);border:1px solid var(--border);overflow:hidden;position:relative}
+  .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;pointer-events:none}
+  .p-atk::before{background:linear-gradient(90deg,transparent,var(--gold3),var(--gold2),var(--gold3),transparent)}
+  .p-def::before{background:linear-gradient(90deg,transparent,var(--crimd),var(--crim2),var(--crimd),transparent)}
+  .p-res::before{background:linear-gradient(90deg,transparent,var(--green),transparent)}
+
+  .ph{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.25)}
+  .ph-icon{font-size:17px}
+  .ph-title{font-family:'Cinzel',serif;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
+  .p-atk .ph-title{color:var(--gold2)} .p-def .ph-title{color:#e09090} .p-res .ph-title{color:var(--green2)}
+  .ph-badge{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 6px;border:1px solid currentColor;
+    letter-spacing:2px;opacity:.5;text-transform:uppercase}
+  .p-atk .ph-badge{color:var(--gold)} .p-def .ph-badge{color:#c07070}
+
+  /* SPY BUTTON */
+  .btn-spy{margin-left:auto;font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;
+    color:var(--text2);background:rgba(0,0,0,.3);border:1px solid var(--bord2);padding:5px 11px;cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s;white-space:nowrap}
+  .btn-spy:hover{border-color:var(--gold3);color:var(--gold2);background:rgba(212,170,80,.08)}
+
+  .pb{padding:14px 16px}
+
+  /* TECH */
+  .tw{position:relative;margin-bottom:12px;padding:11px 12px 10px;background:rgba(0,0,0,.25);border:1px solid var(--border)}
+  .tleg{position:absolute;top:-8px;left:10px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;
+    color:var(--text3);background:#2c2638;padding:0 5px;text-transform:uppercase}
+  .tgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+  .tf{display:flex;flex-direction:column;gap:3px}
+  .tl{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase}
+  .ti{background:rgba(0,0,0,.35);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;
+    font-size:13px;padding:5px 7px;outline:none;width:100%;transition:border-color .18s}
+  .p-atk .ti:focus{border-color:var(--gold3)} .p-def .ti:focus{border-color:var(--crim)}
+
+  /* UNITS */
+  .ucat{font-family:'Cinzel',serif;font-size:9px;letter-spacing:3px;color:var(--text3);margin:10px 0 6px;
+    display:flex;align-items:center;gap:7px;text-transform:uppercase}
+  .ucat::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+  .ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(144px,1fr));gap:4px}
+  .urow{display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(0,0,0,.2);border:1px solid var(--border);
+    transition:border-color .15s,background .15s;position:relative}
+  .urow:hover{border-color:var(--bord2);background:rgba(255,255,255,.02)}
+  .p-atk .urow.on{border-color:rgba(212,170,80,.5);background:rgba(212,170,80,.06)}
+  .p-def .urow.on{border-color:rgba(160,37,58,.5);background:rgba(160,37,58,.07)}
+  .uname{flex:1;font-family:'Crimson Pro',serif;font-size:13px;color:var(--text2);line-height:1.2}
+  .uinput{background:transparent;border:none;border-bottom:1px solid var(--bord2);color:var(--text);
+    font-family:'Share Tech Mono',monospace;font-size:13px;width:50px;text-align:right;padding:1px 2px;outline:none}
+  .p-atk .uinput:focus{border-bottom-color:var(--gold)} .p-def .uinput:focus{border-bottom-color:var(--crim2)}
+  .urow[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 4px);left:0;
+    background:#1a1624;border:1px solid var(--bord2);padding:6px 10px;font-family:'Share Tech Mono',monospace;
+    font-size:10px;color:var(--text2);white-space:pre;z-index:300;min-width:160px;line-height:1.8;pointer-events:none}
+
+  /* MODAL */
+  .modal-back{position:fixed;inset:0;background:rgba(10,8,16,.82);z-index:500;display:none;
+    align-items:center;justify-content:center}
+  .modal-back.open{display:flex}
+  .modal{background:linear-gradient(155deg,#332c44 0%,#281f36 100%);border:1px solid var(--bord2);
+    border-top:2px solid var(--gold3);width:560px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+  .mh{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.3)}
+  .m-title{font-family:'Cinzel',serif;font-size:11px;letter-spacing:3px;color:var(--gold2);text-transform:uppercase}
+  .m-close{margin-left:auto;font-size:17px;color:var(--text3);cursor:pointer;background:none;border:none;
+    line-height:1;padding:2px 5px;transition:color .15s}
+  .m-close:hover{color:var(--text)}
+  .mb{padding:16px 18px}
+  .m-note{font-family:'Crimson Pro',serif;font-style:italic;font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.5}
+  .m-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:2px;
+    text-transform:uppercase;margin-bottom:7px;display:block}
+  .m-ta{width:100%;height:190px;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);
+    font-family:'Share Tech Mono',monospace;font-size:11px;padding:9px 11px;resize:vertical;outline:none;
+    line-height:1.8;transition:border-color .2s}
+  .m-ta:focus{border-color:var(--bord2)}
+  .m-status{font-family:'Share Tech Mono',monospace;font-size:10px;margin-top:8px;padding:5px 10px;
+    display:none;letter-spacing:1px}
+  .m-status.ok{display:block;color:var(--green2);border:1px solid rgba(90,170,72,.4);background:rgba(90,170,72,.08)}
+  .m-status.err{display:block;color:var(--red);border:1px solid rgba(200,51,72,.4);background:rgba(200,51,72,.08)}
+  .mf{display:flex;justify-content:flex-end;gap:9px;margin-top:13px;padding-top:13px;border-top:1px solid var(--border)}
+  .btn-cancel{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+    color:var(--text3);background:rgba(0,0,0,.3);border:1px solid var(--border);padding:7px 18px;cursor:pointer;
+    transition:color .2s,border-color .2s}
+  .btn-cancel:hover{color:var(--text2);border-color:var(--bord2)}
+  .btn-val{font-family:'Cinzel',serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+    color:#18121e;background:linear-gradient(135deg,var(--gold2),var(--gold));border:none;padding:7px 22px;
+    cursor:pointer;transition:box-shadow .2s}
+  .btn-val:hover{box-shadow:0 0 18px rgba(212,170,80,.35)}
+
+  /* SIM ROW */
+  .sim-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:22px}
+  .ss{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .ss-lbl{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase}
+  .sn{background:rgba(0,0,0,.4);border:1px solid var(--bord2);color:var(--gold);font-family:'Share Tech Mono',monospace;
+    font-size:14px;padding:7px 12px;width:88px;text-align:center;outline:none}
+  .sn:focus{border-color:var(--gold3)}
+  .btn-sim{font-family:'Cinzel',serif;font-weight:900;font-size:14px;letter-spacing:4px;text-transform:uppercase;
+    color:#18121e;background:linear-gradient(135deg,var(--gold2) 0%,var(--gold) 50%,var(--gold3) 100%);border:none;
+    padding:14px 42px;cursor:pointer;clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%);
+    position:relative;overflow:hidden;transition:transform .1s,box-shadow .2s}
+  .btn-sim::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.18) 0%,transparent 55%)}
+  .btn-sim:hover{box-shadow:0 0 32px rgba(212,170,80,.4);transform:translateY(-1px)}
+  .btn-sim:active{transform:translateY(1px)}
+
+  /* RESULTS */
+  .p-res,.p-log{grid-column:1/-1;display:none}
+  .p-res.v,.p-log.v{display:block}
+  .res-inner{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .rc{background:rgba(0,0,0,.28);border:1px solid var(--border);padding:13px 15px}
+  .rct{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:2px;
+    text-transform:uppercase;margin-bottom:11px}
+  .outcome{font-family:'Cinzel',serif;font-size:16px;font-weight:700;letter-spacing:1px;margin-bottom:9px}
+  .o-atk{color:var(--gold2);text-shadow:0 0 14px rgba(212,170,80,.4)}
+  .o-def{color:#e09090;text-shadow:0 0 14px rgba(200,48,74,.4)}
+  .o-draw{color:var(--text2)}
+  .wr{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  .wl{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;width:72px}
+  .wp{font-family:'Share Tech Mono',monospace;font-size:13px}
+
+  /* SURVIVAL */
+  .sv-sec{margin-top:11px}
+  .sv-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+  .sv-lbl{font-family:'Share Tech Mono',monospace;font-size:9px;width:42px;color:var(--text3);letter-spacing:1px}
+  .sv-tr{flex:1;height:6px;background:rgba(0,0,0,.5);border:1px solid var(--border);overflow:hidden}
+  .sv-fill{height:100%;transition:width .9s cubic-bezier(.23,1,.32,1)}
+  .fa{background:linear-gradient(90deg,var(--goldd),var(--gold2));box-shadow:0 0 5px rgba(212,170,80,.4)}
+  .fd{background:linear-gradient(90deg,var(--crimd),var(--crim2));box-shadow:0 0 5px rgba(160,37,58,.4)}
+  .sv-pct{font-family:'Share Tech Mono',monospace;font-size:11px;width:34px;text-align:right}
+
+  /* SURVIVOR TABLE */
+  .stbl{width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:10px;margin-top:8px}
+  .stbl th{color:var(--text3);font-weight:400;padding:3px 6px;border-bottom:1px solid var(--border);text-align:left;letter-spacing:1px}
+  .stbl td{padding:3px 6px;border-bottom:1px solid rgba(74,63,96,.3);color:var(--text2)}
+  .stbl tr:last-child td{border-bottom:none}
+  .rv{text-align:right;color:var(--text)}.rv.ls{color:var(--red)}.rv.sv{color:var(--green2)}
+
+  /* RESOURCES */
+  .rt{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin:9px 0 5px}
+  .rg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+  .rb{background:rgba(0,0,0,.33);border:1px solid var(--border);padding:6px 4px;text-align:center}
+  .ri{font-size:14px;margin-bottom:2px}
+  .rv2{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text)}
+  .rk{font-size:9px;color:var(--text3);letter-spacing:1px;font-family:'Share Tech Mono',monospace;margin-top:2px}
+
+  /* LOG */
+  .log-body{padding:9px 13px;max-height:130px;overflow-y:auto;font-family:'Share Tech Mono',monospace;
+    font-size:10px;color:var(--text3);line-height:2}
+  .log-body::-webkit-scrollbar{width:3px}
+  .log-body::-webkit-scrollbar-thumb{background:var(--bord2)}
+  .ll{display:block}.lg{color:var(--gold)}.lcr{color:var(--crim2)}.lgr{color:var(--green2)}
+
+  /* LOADING */
+  .loading{position:fixed;inset:0;background:rgba(20,16,28,.92);display:none;align-items:center;
+    justify-content:center;flex-direction:column;gap:16px;z-index:600}
+  .loading.on{display:flex}
+  .loading-title{font-family:'Cinzel',serif;font-size:13px;letter-spacing:5px;color:var(--gold);text-transform:uppercase}
+  .loading-sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:2px}
+  .progress-wrap{width:320px;display:flex;flex-direction:column;gap:8px}
+  .progress-bar-bg{width:100%;height:4px;background:rgba(255,255,255,.08);border:1px solid var(--border)}
+  .progress-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--gold3),var(--gold2));
+    transition:width .15s linear}
+  .progress-counts{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;
+    font-size:10px;color:var(--text3)}
+
+  @media(max-width:860px){.main{grid-template-columns:1fr}.res-inner{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- MODAL ESPIONNAGE -->
+<div class="modal-back" id="spy-back" onclick="closeSpy(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="mh">
+      <span style="font-size:16px">🔭</span>
+      <span class="m-title">Rapport d'Espionnage</span>
+      <button class="m-close" onclick="closeSpy()">✕</button>
+    </div>
+    <div class="mb">
+      <p class="m-note">Collez le rapport d'espionnage. Les unités et défenses seront importées automatiquement dans la Flotte de Défense.</p>
+      <span class="m-label">Contenu du rapport</span>
+      <textarea class="m-ta" id="spy-ta" placeholder="Collez votre rapport ici…&#10;&#10;Format attendu (une unité par ligne) :&#10;  Nova Scout : 42&#10;  Canon de Masse : 15&#10;&#10;Le parseur sera affiné selon le format exact du jeu."></textarea>
+      <div id="spy-st" class="m-status"></div>
+      <div class="mf">
+        <button class="btn-cancel" onclick="closeSpy()">Annuler</button>
+        <button class="btn-val" onclick="parseSpy()">⟶ Valider l'Import</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="loading-title">Simulation en cours</div>
+  <div class="progress-wrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-fill"></div></div>
+    <div class="progress-counts">
+      <span id="prog-done">0 / 0</span>
+      <span id="prog-pct">0%</span>
+    </div>
+  </div>
+  <div class="loading-sub" id="prog-live">initialisation…</div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <img class="logo-img" src="logo.png" alt="Solaris">
+  <div>
+    <div class="logo-text">SOLARIS</div>
+    <div class="logo-sub">Simulateur de Combat</div>
+  </div>
+  <div class="hdr-right">Moteur JS v2.1 — Web Worker + Barre de progression<br><span style="color:var(--gold3)">■</span> En ligne</div>
+</header>
+<div class="gold-sep"></div>
+
+<div class="main">
+
+  <!-- FLOTTE D'ATTAQUE -->
+  <div class="panel p-atk">
+    <div class="ph">
+      <span class="ph-icon">⚔</span>
+      <span class="ph-title">Flotte d'Attaque</span>
+      <span class="ph-badge">ATK</span>
+    </div>
+    <div class="pb">
+      <div class="tw">
+        <span class="tleg">Technologies</span>
+        <div class="tgrid">
+          <div class="tf"><label class="tl">Sys. Balistiques</label><input type="number" class="ti" id="atk-weapons" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Champs Défl.</label><input type="number" class="ti" id="atk-shield" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Alliages Nano</label><input type="number" class="ti" id="atk-armor" value="0" min="0" max="25"></div>
+        </div>
+      </div>
+      <div id="atk-units"></div>
+    </div>
+  </div>
+
+  <!-- FLOTTE DE DÉFENSE -->
+  <div class="panel p-def">
+    <div class="ph">
+      <span class="ph-icon">🛡</span>
+      <span class="ph-title">Flotte de Défense</span>
+      <span class="ph-badge">DEF</span>
+      <button class="btn-spy" onclick="openSpy()">🔭 Rapport d'Espionnage</button>
+    </div>
+    <div class="pb">
+      <div class="tw">
+        <span class="tleg">Technologies</span>
+        <div class="tgrid">
+          <div class="tf"><label class="tl">Sys. Balistiques</label><input type="number" class="ti" id="def-weapons" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Champs Défl.</label><input type="number" class="ti" id="def-shield" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Alliages Nano</label><input type="number" class="ti" id="def-armor" value="0" min="0" max="25"></div>
+        </div>
+      </div>
+      <div id="def-units"></div>
+    </div>
+  </div>
+
+  <!-- SIM ROW -->
+  <div class="sim-row">
+    <div class="ss"><span class="ss-lbl">Simulations</span><input type="number" class="sn" id="sim-count" value="100" min="1" max="1000"></div>
+    <button class="btn-sim" onclick="runSim()">☀ Lancer la Bataille</button>
+    <div class="ss"><span class="ss-lbl">% Cargo pillé</span><input type="number" class="sn" id="cargo-fill" value="50" min="0" max="100" style="color:var(--text2)"></div>
+  </div>
+
+  <!-- RÉSULTATS -->
+  <div class="panel p-res" id="res-panel">
+    <div class="ph"><span class="ph-icon">☀</span><span class="ph-title">Résultats</span></div>
+    <div class="pb">
+      <div class="res-inner">
+        <!-- Issue -->
+        <div class="rc">
+          <div class="rct">Issue du Combat</div>
+          <div id="res-outcome" class="outcome">—</div>
+          <div class="wr"><span class="wl" style="color:var(--gold)">ATK gagne</span><span id="res-atk-pct" class="wp" style="color:var(--gold)">0%</span></div>
+          <div class="wr"><span class="wl" style="color:#e09090">DEF gagne</span><span id="res-def-pct" class="wp" style="color:#e09090">0%</span></div>
+          <div class="wr"><span class="wl" style="color:var(--text2)">Égalité</span><span id="res-draw-pct" class="wp" style="color:var(--text2)">0%</span></div>
+          <div style="margin-top:11px"><div class="rct">Rounds Moyens</div>
+          <div id="res-rounds" style="font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--text)">—</div></div>
+        </div>
+        <!-- Survivants -->
+        <div class="rc">
+          <div class="rct">Survivants Moyens</div>
+          <div class="sv-sec">
+            <div class="sv-row"><span class="sv-lbl">ATK</span><div class="sv-tr"><div class="sv-fill fa" id="bar-atk" style="width:0%"></div></div><span class="sv-pct" id="pct-atk" style="color:var(--gold)">0%</span></div>
+            <div class="sv-row"><span class="sv-lbl">DEF</span><div class="sv-tr"><div class="sv-fill fd" id="bar-def" style="width:0%"></div></div><span class="sv-pct" id="pct-def" style="color:#e09090">0%</span></div>
+          </div>
+          <div id="tbl-atk" style="margin-top:11px"></div>
+          <div id="tbl-def" style="margin-top:7px"></div>
+        </div>
+        <!-- Économie -->
+        <div class="rc">
+          <div class="rct">Économie de Combat</div>
+          <div class="rt">Pertes — Attaque</div>
+          <div class="rg">
+            <div class="rb"><div class="ri" style="color:#c87840">Fe</div><div class="rv2" id="atk-fer">0</div><div class="rk">Fer</div></div>
+            <div class="rb"><div class="ri" style="color:#4878c0">Si</div><div class="rv2" id="atk-sil">0</div><div class="rk">Silice</div></div>
+            <div class="rb"><div class="ri" style="color:#40a878">Xg</div><div class="rv2" id="atk-xen">0</div><div class="rk">Xenogas</div></div>
+          </div>
+          <div class="rt" style="margin-top:8px">Pertes — Défense</div>
+          <div class="rg">
+            <div class="rb"><div class="ri" style="color:#c87840">Fe</div><div class="rv2" id="def-fer">0</div><div class="rk">Fer</div></div>
+            <div class="rb"><div class="ri" style="color:#4878c0">Si</div><div class="rv2" id="def-sil">0</div><div class="rk">Silice</div></div>
+            <div class="rb"><div class="ri" style="color:#40a878">Xg</div><div class="rv2" id="def-xen">0</div><div class="rk">Xenogas</div></div>
+          </div>
+          <div class="rt" style="margin-top:8px">Champ de Débris (50%)</div>
+          <div class="rg">
+            <div class="rb" style="border-color:rgba(212,170,80,.28)"><div class="ri" style="color:var(--gold)">Fe</div><div class="rv2" id="deb-fer" style="color:var(--gold)">0</div><div class="rk">Fer</div></div>
+            <div class="rb" style="border-color:rgba(212,170,80,.28)"><div class="ri" style="color:var(--gold)">Si</div><div class="rv2" id="deb-sil" style="color:var(--gold)">0</div><div class="rk">Silice</div></div>
+            <div class="rb" style="border-color:rgba(212,170,80,.28)"><div class="ri" style="color:var(--gold)">Xg</div><div class="rv2" id="deb-xen" style="color:var(--gold)">0</div><div class="rk">Xenogas</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="panel p-log" id="log-panel">
+    <div class="ph"><span class="ph-icon" style="font-size:13px">📜</span><span class="ph-title" style="color:var(--text2)">Journal — Dernière Simulation</span></div>
+    <div class="log-body" id="log-body"></div>
+  </div>
+
+</div>
+
+<script>
+const SHIPS=[
+  {id:'nova_scout',     name:'Nova Scout',        fer:3000,   sil:1000,   xen:0,       atk:50,     bou:10,    cqu:400    },
+  {id:'fer_de_lance',   name:'Fer de Lance',       fer:6000,   sil:4000,   xen:0,       atk:150,    bou:25,    cqu:1000   },
+  {id:'cyclone',        name:'Cyclone',            fer:20000,  sil:7000,   xen:2000,    atk:400,    bou:50,    cqu:2700   },
+  {id:'bastion',        name:'Bastion',            fer:45000,  sil:15000,  xen:0,       atk:1000,   bou:200,   cqu:6000   },
+  {id:'pyro',           name:'Pyro',               fer:50000,  sil:25000,  xen:15000,   atk:1000,   bou:500,   cqu:7500   },
+  {id:'nemesis',        name:'Nemesis',            fer:30000,  sil:40000,  xen:15000,   atk:700,    bou:400,   cqu:7000   },
+  {id:'fulgurant',      name:'Fulgurant',          fer:60000,  sil:50000,  xen:15000,   atk:2000,   bou:500,   cqu:11000  },
+  {id:'titan_astral',   name:'Titan Astral',       fer:5000000,sil:4000000,xen:1000000, atk:200000, bou:50000, cqu:900000 },
+  {id:'atlas_cargo',    name:'Atlas Cargo',        fer:2000,   sil:2000,   xen:0,       atk:5,      bou:10,    cqu:400    },
+  {id:'atlas_cargo_xl', name:'Atlas Cargo XL',     fer:6000,   sil:6000,   xen:0,       atk:5,      bou:25,    cqu:1200   },
+  {id:'barge_col',      name:'Barge Coloniale',    fer:10000,  sil:20000,  xen:10000,   atk:50,     bou:100,   cqu:3000   },
+  {id:'manta_recup',    name:'Manta Recup',        fer:10000,  sil:6000,   xen:2000,    atk:1,      bou:10,    cqu:1600   },
+  {id:'spectre_s',      name:'Spectre Sonde',      fer:0,      sil:1000,   xen:0,       atk:0,      bou:0,     cqu:100    },
+  {id:'helios_r',       name:'Helios Remorqueur',  fer:0,      sil:2000,   xen:500,     atk:1,      bou:1,     cqu:200    },
+];
+const DEFS=[
+  {id:'tourelle_c',  name:'Tourelle Cinétique',  fer:2000,  sil:0,    xen:0,    atk:80,   bou:20,   cqu:200  },
+  {id:'canon_imp',   name:'Canon à Impulsion',   fer:1500,  sil:500,  xen:0,    atk:100,  bou:25,   cqu:250  },
+  {id:'canon_fais',  name:'Canon de Faisceau',   fer:6000,  sil:2000, xen:0,    atk:250,  bou:100,  cqu:800  },
+  {id:'canon_m',     name:'Canon de Masse',      fer:20000, sil:15000,xen:2000, atk:1100, bou:200,  cqu:3500 },
+  {id:'proj_ion',    name:'Projecteur Ionique',  fer:5000,  sil:3000, xen:0,    atk:150,  bou:500,  cqu:800  },
+  {id:'canon_sol',   name:'Canon Solaire',       fer:50000, sil:50000,xen:30000,atk:3000, bou:300,  cqu:10000},
+  {id:'bouclier_p',  name:'Petit Bouclier Plan.',fer:10000, sil:10000,xen:0,    atk:1,    bou:2000, cqu:2000 },
+  {id:'bouclier_g',  name:'Grand Bouclier Plan.',fer:50000, sil:50000,xen:0,    atk:1,    bou:10000,cqu:10000},
+];
+
+function sf(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n)}
+function ff(n){return Math.round(n).toLocaleString('fr-FR')}
+function gv(id){return parseInt(document.getElementById(id).value)||0}
+
+/* ── CONSTRUCTION DES PANNEAUX UI ──
+   ATK : vaisseaux uniquement (pas de défenses)
+   DEF : vaisseaux + défenses */
+function buildPanel(cid, pre, includeDefenses){
+  const c=document.getElementById(cid);
+  let h='<div class="ucat">Vaisseaux</div><div class="ugrid">';
+  SHIPS.forEach(u=>h+=ur(u,pre));
+  h+='</div>';
+  if(includeDefenses){
+    h+='<div class="ucat">Défenses</div><div class="ugrid">';
+    DEFS.forEach(u=>h+=ur(u,pre));
+    h+='</div>';
+  }
+  c.innerHTML=h;
+}
+function ur(u,pre){
+  const t=`ATK: ${u.atk}  BOU: ${u.bou}  CQU: ${u.cqu}\nFer: ${sf(u.fer)}  Sil: ${sf(u.sil)}  Xen: ${sf(u.xen||0)}`;
+  return `<div class="urow" data-tip="${t}"><span class="uname">${u.name}</span><input type="number" class="uinput" id="${pre}-${u.id}" value="0" min="0" oninput="mr(this)"></div>`;
+}
+function mr(inp){inp.closest('.urow').classList.toggle('on',parseInt(inp.value)>0)}
+
+buildPanel('atk-units','atk', false);  // ATK : vaisseaux seulement
+buildPanel('def-units','def', true);   // DEF : vaisseaux + défenses
+
+/* Name map pour parseur */
+const nameMap={};
+[...SHIPS,...DEFS].forEach(u=>{
+  nameMap[u.name.toLowerCase()]=u.id;
+  u.name.split(' ').forEach(w=>{const k=w.toLowerCase();if(k.length>3&&!nameMap[k])nameMap[k]=u.id;});
+});
+
+/* MODAL */
+function openSpy(){document.getElementById('spy-back').classList.add('open');document.getElementById('spy-st').className='m-status';}
+function closeSpy(e){if(e&&e.target!==document.getElementById('spy-back'))return;document.getElementById('spy-back').classList.remove('open');}
+
+function parseSpy(){
+  const raw=document.getElementById('spy-ta').value.trim();
+  const st=document.getElementById('spy-st');
+  if(!raw){st.textContent='Aucun contenu.';st.className='m-status err';return;}
+
+  [...SHIPS,...DEFS].forEach(u=>{
+    const el=document.getElementById('def-'+u.id);
+    if(el){el.value=0;el.closest('.urow').classList.remove('on');}
+  });
+
+  let found=0;
+  raw.split('\n').forEach(line=>{
+    line=line.trim();
+    const m=line.match(/^(.+?)[\s:x×*]+(\d[\d\s]*)$/i);
+    if(!m)return;
+    const rn=m[1].trim().toLowerCase().replace(/\s+/g,' ');
+    const qty=parseInt(m[2].replace(/\s/g,''));
+    if(!qty)return;
+    let id=nameMap[rn];
+    if(!id){for(const[k,v]of Object.entries(nameMap)){if(rn.includes(k)||k.includes(rn)){id=v;break;}}}
+    if(id){const el=document.getElementById('def-'+id);if(el){el.value=qty;el.closest('.urow').classList.add('on');found++;}}
+  });
+
+  if(found>0){
+    st.textContent=`✓ ${found} type(s) importés avec succès.`;st.className='m-status ok';
+    setTimeout(()=>document.getElementById('spy-back').classList.remove('open'),1100);
+  } else {
+    st.textContent='Aucune unité reconnue — parseur à adapter au format du jeu.';st.className='m-status err';
+  }
+}
+
+/* ═══════════════════════════════════════
+   RAPIDFIRE TABLE  (tireur → {cible: rf})
+   Prob de tir supplémentaire = (rf-1)/rf
+═══════════════════════════════════════ */
+const RF={
+  // Cyclone (≈ Cruiser OGame)
+  'cyclone':    {'nova_scout':6,'tourelle_c':10,'canon_imp':10},
+  // Nemesis (≈ Battlecruiser)
+  'nemesis':    {'nova_scout':3,'atlas_cargo':3,'atlas_cargo_xl':3},
+  // Fulgurant (≈ Destroyer)
+  'fulgurant':  {'cyclone':5,'canon_imp':5,'tourelle_c':5},
+  // Pyro (≈ Bomber)
+  'pyro':       {'tourelle_c':20,'canon_imp':20,'canon_fais':10,'canon_m':5},
+  // Nova Scout / cargos → Spectre Sonde
+  'nova_scout': {'spectre_s':5},
+  'atlas_cargo':{'spectre_s':5},
+  'atlas_cargo_xl':{'spectre_s':5},
+  // Titan Astral (≈ Deathstar) — RF massif contre tout
+  'titan_astral':{
+    'nova_scout':200,'fer_de_lance':100,'cyclone':33,'bastion':30,
+    'nemesis':15,'fulgurant':5,'pyro':7,
+    'atlas_cargo':250,'atlas_cargo_xl':250,'manta_recup':250,'barge_col':250,
+    'tourelle_c':200,'canon_imp':200,'canon_fais':100,'canon_m':33,
+    'proj_ion':100,'canon_sol':33,'bouclier_p':200,'bouclier_g':200,
+    'spectre_s':1250,'helios_r':1250,
+  },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   MOTEUR v2 — Entités individuelles
+   Chaque vaisseau/défense est un objet {typeId, hull, hullMax, sp, spMax, atk, bou}
+   • Explosion : si hull < 70% hullMax → prob (1 - hull/hullMax) à chaque tir reçu
+   • RF sur cibles potentiellement déjà mortes dans le round (comme OGame)
+   • Bounce : ATK < 1% du bouclier ACTUEL de la cible → annulé
+   • Unités mortes restent dans la liste jusqu'à fin de round (tirent encore)
+   • Reconstruction défenses 70% après combat
+═══════════════════════════════════════════════════════════ */
+
+function boost(u,w,s,a){
+  return{...u,atk:u.atk*(1+w*.1),bou:u.bou*(1+s*.1),cqu:u.cqu*(1+a*.1)};
+}
+
+/* Construit un tableau d'entités individuelles à partir d'une définition boostée */
+function makeEntities(u){
+  const arr=[];
+  for(let i=0;i<u.count;i++){
+    arr.push({
+      typeId: u.id,
+      atk:    u.atk,
+      bou:    u.bou,   // bouclier max par unité
+      hullMax:u.cqu,
+      hull:   u.cqu,
+      sp:     u.bou,   // bouclier courant (régénère à bou en fin de round)
+      dead:   false,   // mort ce round (tire encore jusqu'à fin de round)
+      removed:false,   // retiré après fin de round
+    });
+  }
+  return arr;
+}
+
+function buildFleet(pre,w,s,a){
+  return[...SHIPS,...DEFS].map(u=>{
+    const c=gv(`${pre}-${u.id}`);
+    if(!c)return null;
+    const b=boost(u,w,s,a);
+    return{...b, count:c, origCount:c};
+  }).filter(Boolean);
+}
+
+/* Nombre d'unités vivantes (non retirées) */
+function countAlive(entities){ return entities.filter(e=>!e.removed).length; }
+
+/* Somme par type pour le rapport de résultat */
+function countByType(entities){
+  const m={};
+  entities.forEach(e=>{
+    if(!e.removed){ m[e.typeId]=(m[e.typeId]||0)+1; }
+  });
+  return m;
+}
+
+function simulate(ab,db){
+  /* Construire les entités individuelles */
+  let atk=[];  ab.forEach(u=>{ atk=atk.concat(makeEntities(u)); });
+  let def=[];  db.forEach(u=>{ def=def.concat(makeEntities(u)); });
+
+  const log=[]; let rounds=0;
+
+  for(let r=0;r<6;r++){
+    rounds++;
+    if(!countAlive(atk)||!countAlive(def)) break;
+
+    /* Marquer tous comme vivants pour ce round */
+    atk.forEach(e=>e.dead=false);
+    def.forEach(e=>e.dead=false);
+
+    /* Phase de tir — les deux côtés tirent simultanément
+       Les morts de ce round restent dans la liste (dead=true) jusqu'après le tir */
+    firePhase(atk, def);
+    firePhase(def, atk);
+
+    /* Fin de round : retirer les morts, régénérer boucliers des survivants */
+    atk.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
+    def.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
+
+    const ra=countAlive(atk), rd=countAlive(def);
+    log.push(`Round ${r+1} → ATK: ${ra} | DEF: ${rd}`);
+
+    if(!ra||!rd) break;
+  }
+
+  const al=countAlive(atk), dl=countAlive(def);
+  const winner=al>0&&dl===0?'atk':dl>0&&al===0?'def':'draw';
+
+  /* Reconstruction défenses 70% — on recrée des entités pour les survivants def
+     Mais pour le comptage on utilise les vivants à l'issue du combat */
+  return{winner, rounds, atkEntities:atk, defEntities:def, log};
+}
+
+/* ── Phase de tir d'un côté vers l'autre ── */
+function firePhase(shooters, targets){
+  /* Les tireurs valides : non retirés (incluant dead=true de ce round) */
+  const validShooters = shooters.filter(e=>!e.removed);
+  /* Les cibles valides : non retirés (incluant dead=true de ce round — OGame exact) */
+  const validTargets  = targets.filter(e=>!e.removed);
+  if(!validShooters.length||!validTargets.length) return;
+
+  validShooters.forEach(sh=>{
+    const rfMap=RF[sh.typeId]||{};
+    let shooting=true;
+
+    while(shooting){
+      /* Choisir cible aléatoire parmi toutes les non-retirées (y compris dead) */
+      const pool=targets.filter(e=>!e.removed);
+      if(!pool.length) break;
+      const t=pool[Math.floor(Math.random()*pool.length)];
+
+      /* ── BOUNCE : ATK < 1% du bouclier ACTUEL de la cible ── */
+      if(sh.atk >= t.sp*0.01){
+        /* Dégâts */
+        if(sh.atk<=t.sp){
+          /* Bouclier absorbe tout */
+          t.sp-=sh.atk;
+        } else {
+          /* Bouclier tombe à 0, excédent en hull */
+          const excess=sh.atk-t.sp;
+          t.sp=0;
+          t.hull-=excess;
+          if(t.hull<0) t.hull=0;
+        }
+
+        /* ── EXPLOSION aléatoire ──
+           Évaluée à chaque tir reçu si hull < 70% hullMax
+           Prob = 1 - hull/hullMax */
+        if(!t.dead && t.hull < t.hullMax*0.7){
+          if(Math.random() > t.hull/t.hullMax){
+            t.hull=0;
+            t.dead=true;  /* explose — reste dans la liste jusqu'à fin de round */
+          }
+        }
+        /* Hull à 0 sans explosion → mort aussi */
+        if(t.hull<=0) t.dead=true;
+      }
+
+      /* ── RAPIDFIRE ──
+         Prob tir suivant = (rf-1)/rf, ciblant n'importe quelle cible non-retirée */
+      const rf=rfMap[t.typeId]||0;
+      shooting = rf>1 && Math.random()<(rf-1)/rf;
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   WEB WORKER INLINE — le moteur tourne dans un thread
+   séparé pour ne jamais bloquer le navigateur
+══════════════════════════════════════════════════════ */
+
+const WORKER_SRC = `
+/* === Données embarquées dans le worker === */
+const RF={
+  'cyclone':       {'nova_scout':6,'tourelle_c':10,'canon_imp':10},
+  'nemesis':       {'nova_scout':3,'atlas_cargo':3,'atlas_cargo_xl':3},
+  'fulgurant':     {'cyclone':5,'canon_imp':5,'tourelle_c':5},
+  'pyro':          {'tourelle_c':20,'canon_imp':20,'canon_fais':10,'canon_m':5},
+  'nova_scout':    {'spectre_s':5},
+  'atlas_cargo':   {'spectre_s':5},
+  'atlas_cargo_xl':{'spectre_s':5},
+  'titan_astral':{
+    'nova_scout':200,'fer_de_lance':100,'cyclone':33,'bastion':30,
+    'nemesis':15,'fulgurant':5,'pyro':7,
+    'atlas_cargo':250,'atlas_cargo_xl':250,'manta_recup':250,'barge_col':250,
+    'tourelle_c':200,'canon_imp':200,'canon_fais':100,'canon_m':33,
+    'proj_ion':100,'canon_sol':33,'bouclier_p':200,'bouclier_g':200,
+    'spectre_s':1250,'helios_r':1250,
+  },
+};
+
+function makeEntities(u){
+  const arr=[];
+  for(let i=0;i<u.count;i++){
+    arr.push({typeId:u.id,atk:u.atk,bou:u.bou,hullMax:u.cqu,hull:u.cqu,sp:u.bou,dead:false,removed:false});
+  }
+  return arr;
+}
+
+function countAlive(ents){ return ents.reduce((s,e)=>s+(e.removed?0:1),0); }
+
+function countByType(ents){
+  const m={};
+  ents.forEach(e=>{ if(!e.removed) m[e.typeId]=(m[e.typeId]||0)+1; });
+  return m;
+}
+
+function firePhase(shooters,targets){
+  const validS=shooters.filter(e=>!e.removed);
+  if(!validS.length) return;
+  validS.forEach(sh=>{
+    const rfMap=RF[sh.typeId]||{};
+    let shooting=true;
+    while(shooting){
+      const pool=targets.filter(e=>!e.removed);
+      if(!pool.length) break;
+      const t=pool[Math.floor(Math.random()*pool.length)];
+      if(sh.atk>=t.sp*0.01){
+        if(sh.atk<=t.sp){ t.sp-=sh.atk; }
+        else{ t.hull-=(sh.atk-t.sp); t.sp=0; if(t.hull<0)t.hull=0; }
+        if(!t.dead && t.hull<t.hullMax*0.7){
+          if(Math.random()>t.hull/t.hullMax){ t.hull=0; t.dead=true; }
+        }
+        if(t.hull<=0) t.dead=true;
+      }
+      const rf=rfMap[t.typeId]||0;
+      shooting=rf>1&&Math.random()<(rf-1)/rf;
+    }
+  });
+}
+
+function simulate(ab,db){
+  let atk=[]; ab.forEach(u=>{ atk=atk.concat(makeEntities(u)); });
+  let def=[]; db.forEach(u=>{ def=def.concat(makeEntities(u)); });
+  const log=[]; let rounds=0;
+  for(let r=0;r<6;r++){
+    rounds++;
+    if(!countAlive(atk)||!countAlive(def)) break;
+    atk.forEach(e=>e.dead=false);
+    def.forEach(e=>e.dead=false);
+    firePhase(atk,def); firePhase(def,atk);
+    atk.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
+    def.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
+    atk=atk.filter(e=>!e.removed);
+    def=def.filter(e=>!e.removed);
+    log.push('Round '+(r+1)+' → ATK: '+atk.length+' | DEF: '+def.length);
+  }
+  const al=atk.length,dl=def.length;
+  const winner=al>0&&dl===0?'atk':dl>0&&al===0?'def':'draw';
+  return{winner,rounds,atkSurv:countByType2(atk),defSurv:countByType2(def),log};
+}
+
+function countByType2(ents){
+  const m={};
+  ents.forEach(e=>{ m[e.typeId]=(m[e.typeId]||0)+1; });
+  return m;
+}
+
+/* === Boucle principale du worker === */
+self.onmessage=function(e){
+  const{ab,db,n}=e.data;
+  let aw=0,dw=0,dr=0,tr=0;
+  const as2={},ds2={};
+  ab.forEach(u=>as2[u.id]=0);
+  db.forEach(u=>ds2[u.id]=0);
+  let lastLog=[];
+  const CHUNK=10; // envoyer progression toutes les 10 sims
+
+  for(let i=0;i<n;i++){
+    const res=simulate(ab.map(u=>({...u})),db.map(u=>({...u})));
+    if(res.winner==='atk')aw++;
+    else if(res.winner==='def')dw++;
+    else dr++;
+    tr+=res.rounds;
+    ab.forEach(u=>{ as2[u.id]+=(res.atkSurv[u.id]||0); });
+    db.forEach(u=>{ ds2[u.id]+=(res.defSurv[u.id]||0); });
+    if(i===n-1) lastLog=res.log;
+
+    if((i+1)%CHUNK===0||(i+1)===n){
+      self.postMessage({type:'progress',done:i+1,total:n,
+        aw,dw,dr,       // live stats
+      });
+    }
+  }
+  self.postMessage({type:'done',aw,dw,dr,tr,as2,ds2,lastLog,n});
+};
+`;
+
+let activeWorker=null;
+
+function runSim(){
+  const n    = gv('sim-count')||100;
+  const aw   = gv('atk-weapons'), as_ = gv('atk-shield'), aa = gv('atk-armor');
+  const dw   = gv('def-weapons'), ds  = gv('def-shield'), da = gv('def-armor');
+
+  /* Construire les flottes sérialisables (pas d'entités, juste les defs boostées) */
+  const ab=buildFleetData('atk',aw,as_,aa);
+  const db=buildFleetData('def',dw,ds,da);
+  const totAtk=ab.reduce((s,u)=>s+u.count,0);
+  const totDef=db.reduce((s,u)=>s+u.count,0);
+  if(!totAtk&&!totDef){alert('Ajoutez des unités des deux côtés !');return;}
+
+  /* Annuler un worker précédent si encore actif */
+  if(activeWorker){ activeWorker.terminate(); activeWorker=null; }
+
+  /* Afficher la barre de chargement */
+  document.getElementById('loading').classList.add('on');
+  document.getElementById('prog-fill').style.width='0%';
+  document.getElementById('prog-done').textContent='0 / '+n;
+  document.getElementById('prog-pct').textContent='0%';
+  document.getElementById('prog-live').textContent='initialisation…';
+
+  /* Créer le Web Worker depuis un blob */
+  const blob=new Blob([WORKER_SRC],{type:'application/javascript'});
+  const url=URL.createObjectURL(blob);
+  activeWorker=new Worker(url);
+  URL.revokeObjectURL(url);
+
+  activeWorker.onmessage=function(e){
+    const d=e.data;
+
+    if(d.type==='progress'){
+      const pct=Math.round(d.done/d.total*100);
+      document.getElementById('prog-fill').style.width=pct+'%';
+      document.getElementById('prog-done').textContent=d.done+' / '+d.total;
+      document.getElementById('prog-pct').textContent=pct+'%';
+      /* Stats live pendant le calcul */
+      const live='ATK '+Math.round(d.aw/d.done*100)+'%  |  DEF '+Math.round(d.dw/d.done*100)+'%  |  Ég. '+Math.round(d.dr/d.done*100)+'%';
+      document.getElementById('prog-live').textContent=live;
+      return;
+    }
+
+    if(d.type==='done'){
+      document.getElementById('loading').classList.remove('on');
+      activeWorker=null;
+      applyResults(d, ab, db, totAtk, totDef);
+    }
+  };
+
+  activeWorker.onerror=function(err){
+    console.error('Worker error',err);
+    document.getElementById('loading').classList.remove('on');
+    activeWorker=null;
+  };
+
+  activeWorker.postMessage({ab,db,n});
+}
+
+/* Construit les données de flotte sérialisables pour le Worker */
+function buildFleetData(pre,w,s,a){
+  const all=pre==='atk'
+    ? [...SHIPS]
+    : [...SHIPS,...DEFS];
+  return all.map(u=>{
+    const c=gv(`${pre}-${u.id}`);
+    if(!c) return null;
+    return{
+      id:u.id, name:u.name,
+      count:c, origCount:c,
+      atk:u.atk*(1+w*.1),
+      bou:u.bou*(1+s*.1),
+      cqu:u.cqu*(1+a*.1),
+      fer:u.fer, sil:u.sil, xen:u.xen||0,
+    };
+  }).filter(Boolean);
+}
+
+function applyResults(d,ab,db,totAtk,totDef){
+  const{aw,dw,dr,tr,as2,ds2,lastLog,n}=d;
+  const ap=(aw/n*100).toFixed(1), dp=(dw/n*100).toFixed(1),
+        rp=(dr/n*100).toFixed(1), ar=(tr/n).toFixed(2);
+
+  const out=document.getElementById('res-outcome');
+  if(aw>=dw&&aw>=dr){out.textContent='⚔ Victoire — Attaque';out.className='outcome o-atk';}
+  else if(dw>=aw&&dw>=dr){out.textContent='🛡 Victoire — Défense';out.className='outcome o-def';}
+  else{out.textContent='⚖ Égalité';out.className='outcome o-draw';}
+
+  document.getElementById('res-atk-pct').textContent=ap+'%';
+  document.getElementById('res-def-pct').textContent=dp+'%';
+  document.getElementById('res-draw-pct').textContent=rp+'%';
+  document.getElementById('res-rounds').textContent=ar;
+
+  const atkAvg=Object.values(as2).reduce((s,v)=>s+v,0)/n;
+  const defAvg=Object.values(ds2).reduce((s,v)=>s+v,0)/n;
+  const ap2=totAtk?Math.round(atkAvg/totAtk*100):0;
+  const dp2=totDef?Math.round(defAvg/totDef*100):0;
+  document.getElementById('bar-atk').style.width=ap2+'%';
+  document.getElementById('bar-def').style.width=dp2+'%';
+  document.getElementById('pct-atk').textContent=ap2+'%';
+  document.getElementById('pct-def').textContent=dp2+'%';
+
+  survTable('tbl-atk',ab,as2,n,'atk');
+  survTable('tbl-def',db,ds2,n,'def');
+
+  let af=0,asil=0,ax=0,df=0,dsil=0,dx=0;
+  ab.forEach(u=>{const l=u.origCount-(as2[u.id]||0)/n;af+=l*u.fer;asil+=l*u.sil;ax+=l*(u.xen||0);});
+  db.forEach(u=>{const l=u.origCount-(ds2[u.id]||0)/n;df+=l*u.fer;dsil+=l*u.sil;dx+=l*(u.xen||0);});
+  ['atk-fer','atk-sil','atk-xen','def-fer','def-sil','def-xen','deb-fer','deb-sil','deb-xen'].forEach((id,i)=>{
+    const vals=[af,asil,ax,df,dsil,dx,(af+df)*.5,(asil+dsil)*.5,(ax+dx)*.5];
+    document.getElementById(id).textContent=ff(vals[i]);
+  });
+
+  document.getElementById('log-body').innerHTML=lastLog.map(l=>`<span class="ll"><span class="lg">[${l.split('→')[0].trim()}]</span><span class="lcr"> → </span>${l.split('→')[1]||''}</span>`).join('');
+  document.getElementById('res-panel').classList.add('v');
+  document.getElementById('log-panel').classList.add('v');
+}
+
+function survTable(id,fleet,survivors,n,side){
+  const c=document.getElementById(id);
+  if(!fleet.length){c.innerHTML='';return;}
+  const col=side==='atk'?'var(--gold)':'#e09090';
+  let h=`<div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${col};letter-spacing:2px;margin-bottom:4px;text-transform:uppercase">${side==='atk'?'Attaque':'Défense'} — Unités</div>`;
+  h+=`<table class="stbl"><tr><th>Unité</th><th style="text-align:right">Init.</th><th style="text-align:right">Surv.</th><th style="text-align:right">Pertes</th></tr>`;
+  fleet.forEach(u=>{
+    const avg=(survivors[u.id]||0)/n;
+    const lost=u.origCount-avg;
+    h+=`<tr><td>${u.name}</td><td class="rv">${u.origCount}</td><td class="rv sv">${avg.toFixed(1)}</td><td class="rv ls">${lost.toFixed(1)}</td></tr>`;
+  });
+  h+='</table>';c.innerHTML=h;
+}
+</script>
+</body>
+</html>
