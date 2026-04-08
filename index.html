@@ -17,6 +17,11 @@
   --yellow:#f0b840;--yellow-bg:rgba(240,184,64,.10);--yellow-bd:rgba(240,184,64,.28);
   --text:#e8eaf2;--text2:#8890a8;--text3:#4a5268;
   --r-lg:20px;--r-md:14px;--r-sm:10px;
+
+  /* Couleurs ressources — calquées sur l'app Solaris */
+  --c-fer:   #c8cdd8;   /* gris blanc neutre  */
+  --c-sil:   #9b7fe8;   /* violet/mauve       */
+  --c-xen:   #38b8e0;   /* bleu cyan          */
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;
@@ -132,12 +137,14 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
   font-family:'Inter',sans-serif;font-size:14px;font-weight:700;
   padding:9px 14px;width:90px;text-align:center;outline:none;border-radius:10px;transition:border-color .2s}
 .sn:focus{border-color:var(--yellow-bd)}
-.btn-sim{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;
-  color:#050a0e;background:linear-gradient(135deg,#3ee8a0 0%,#2ecc8a 100%);
-  border:none;border-radius:14px;padding:14px 42px;cursor:pointer;
-  transition:transform .1s,box-shadow .2s;box-shadow:0 4px 16px rgba(46,204,138,.2)}
-.btn-sim:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(46,204,138,.38)}
-.btn-sim:active{transform:translateY(1px)}
+.btn-sim{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
+  color:var(--green);background:transparent;
+  border:1.5px solid var(--green-bd);border-radius:14px;
+  padding:13px 42px;cursor:pointer;
+  transition:background .2s,border-color .2s,color .2s;
+  letter-spacing:.2px;}
+.btn-sim:hover{background:var(--green-bg);border-color:var(--green);}
+.btn-sim:active{transform:scale(.98)}
 
 /* RESULTS */
 .c-res,.c-log{grid-column:1/-1;display:none}
@@ -293,15 +300,15 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
         <div class="tech-section-lbl" style="color:var(--yellow);opacity:.8">Ressources sur la Planète</div>
         <div class="tgrid">
           <div class="tf">
-            <label class="tl" style="color:#c07030">Fer</label>
+            <label class="tl" style="color:var(--c-fer)">Fer</label>
             <input type="number" class="ti" id="planet-fer" value="0" min="0" placeholder="0" style="border-color:rgba(192,112,48,.3)">
           </div>
           <div class="tf">
-            <label class="tl" style="color:#3870c0">Silice</label>
+            <label class="tl" style="color:var(--c-sil)">Silice</label>
             <input type="number" class="ti" id="planet-sil" value="0" min="0" placeholder="0" style="border-color:rgba(56,112,192,.3)">
           </div>
           <div class="tf">
-            <label class="tl" style="color:#30a070">Xenogas</label>
+            <label class="tl" style="color:var(--c-xen)">Xenogas</label>
             <input type="number" class="ti" id="planet-xen" value="0" min="0" placeholder="0" style="border-color:rgba(48,160,112,.3)">
           </div>
         </div>
@@ -342,15 +349,15 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
           <div class="rct">Économie de Combat</div>
           <div class="rt">Pertes — Attaque</div>
           <div class="rg">
-            <div class="rb"><div class="ri" style="color:#e09050">Fe</div><div class="rv2" id="atk-fer">0</div><div class="rk">Fer</div></div>
-            <div class="rb"><div class="ri" style="color:#5090e0">Si</div><div class="rv2" id="atk-sil">0</div><div class="rk">Silice</div></div>
-            <div class="rb"><div class="ri" style="color:#40c090">Xg</div><div class="rv2" id="atk-xen">0</div><div class="rk">Xenogas</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-fer)">Fe</div><div class="rv2" id="atk-fer">0</div><div class="rk">Fer</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-sil)">Si</div><div class="rv2" id="atk-sil">0</div><div class="rk">Silice</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-xen)">Xg</div><div class="rv2" id="atk-xen">0</div><div class="rk">Xenogas</div></div>
           </div>
           <div class="rt" style="margin-top:8px">Pertes — Défense</div>
           <div class="rg">
-            <div class="rb"><div class="ri" style="color:#e09050">Fe</div><div class="rv2" id="def-fer">0</div><div class="rk">Fer</div></div>
-            <div class="rb"><div class="ri" style="color:#5090e0">Si</div><div class="rv2" id="def-sil">0</div><div class="rk">Silice</div></div>
-            <div class="rb"><div class="ri" style="color:#40c090">Xg</div><div class="rv2" id="def-xen">0</div><div class="rk">Xenogas</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-fer)">Fe</div><div class="rv2" id="def-fer">0</div><div class="rk">Fer</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-sil)">Si</div><div class="rv2" id="def-sil">0</div><div class="rk">Silice</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-xen)">Xg</div><div class="rv2" id="def-xen">0</div><div class="rk">Xenogas</div></div>
           </div>
           <div class="rt" style="margin-top:8px">CDR — Champ de Débris <span style="font-weight:400;opacity:.6">(30% fer+sil)</span></div>
           <div class="rg">
