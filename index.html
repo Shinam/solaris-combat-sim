@@ -32,9 +32,19 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgba(8,10,18,.96);
   border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200;backdrop-filter:blur(12px)}
 .logo-img{width:40px;height:40px;border-radius:12px;box-shadow:0 0 16px rgba(46,204,138,.2)}
-.logo-text{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;color:#fff;letter-spacing:.3px}
-.logo-text span{color:var(--green)}
-.logo-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.logo-text{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;
+  font-size:22px;
+  letter-spacing:3px;
+  background:linear-gradient(105deg, #e8c060 0%, #d4902a 40%, #c0561a 70%, #a03028 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  text-shadow:none;
+}
+.logo-text span{ -webkit-text-fill-color:inherit; color:inherit; }
+.logo-sub{font-size:10px;color:#6a5a48;margin-top:2px;letter-spacing:.5px}
 .hdr-badge{margin-left:auto;background:var(--green-bg);border:1px solid var(--green-bd);color:var(--green);
   font-size:10px;font-weight:600;padding:4px 12px;border-radius:20px;letter-spacing:.3px}
 
@@ -250,7 +260,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
 <header>
   <img class="logo-img" src="logo.png" alt="Solaris">
   <div>
-    <div class="logo-text">SOLAR<span>IS</span></div>
+    <div class="logo-text">SOLARIS</div>
     <div class="logo-sub">Simulateur de Combat</div>
   </div>
   <div class="hdr-badge">v2.1</div>
