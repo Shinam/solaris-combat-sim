@@ -206,7 +206,32 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
 .lcr{color:var(--text3)}
 .lgr{color:var(--green)}
 
-/* LOADING */
+/* SHARE MODAL */
+.share-modal-back{position:fixed;inset:0;background:rgba(4,6,12,.88);z-index:500;display:none;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.share-modal-back.open{display:flex}
+.share-modal{background:var(--card);border:1px solid var(--border2);border-radius:var(--r-lg);
+  width:480px;max-width:95vw;box-shadow:0 24px 64px rgba(0,0,0,.8);overflow:hidden}
+.share-banner{padding:20px 20px 16px;background:var(--card2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px}
+.share-banner-icon{width:38px;height:38px;border-radius:10px;background:var(--purple-bg);
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.share-banner-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:var(--text)}
+.share-banner-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.share-close{margin-left:auto;font-size:18px;color:var(--text3);cursor:pointer;background:none;border:none;
+  padding:2px 6px;border-radius:6px;transition:all .15s}
+.share-close:hover{color:var(--text);background:var(--border)}
+.share-body{padding:18px 20px}
+.share-url-wrap{display:flex;gap:8px;align-items:center}
+.share-url{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:10px;
+  color:var(--text2);font-family:'Inter',monospace;font-size:11px;padding:10px 12px;
+  outline:none;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn-copy{font-size:12px;font-weight:600;color:var(--purple);background:var(--purple-bg);
+  border:1px solid var(--purple-bd);border-radius:10px;padding:10px 16px;cursor:pointer;
+  transition:all .2s;white-space:nowrap;flex-shrink:0}
+.btn-copy:hover{background:rgba(124,90,245,.22)}
+.btn-copy.copied{color:var(--green);background:var(--green-bg);border-color:var(--green-bd)}
+.share-note{font-size:11px;color:var(--text3);margin-top:10px;line-height:1.6}
 .loading{position:fixed;inset:0;background:rgba(4,6,12,.92);display:none;align-items:center;
   justify-content:center;flex-direction:column;gap:16px;z-index:600;backdrop-filter:blur(8px)}
 .loading.on{display:flex}
@@ -239,6 +264,27 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
         <button class="btn-cancel" onclick="closeSpy()">Annuler</button>
         <button class="btn-val" onclick="parseSpy()">Valider l'import</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="share-modal-back" id="share-back" onclick="closeShare(event)">
+  <div class="share-modal" onclick="event.stopPropagation()">
+    <div class="share-banner">
+      <div class="share-banner-icon">🔗</div>
+      <div>
+        <div class="share-banner-title">Partager le Rapport de Combat</div>
+        <div class="share-banner-sub">Config + résultats encodés dans le lien — aucune base de données</div>
+      </div>
+      <button class="share-close" onclick="closeShare()">✕</button>
+    </div>
+    <div class="share-body">
+      <div class="share-url-wrap">
+        <input class="share-url" id="share-url" readonly onclick="this.select()">
+        <button class="btn-copy" id="btn-copy" onclick="copyShareUrl()">Copier</button>
+      </div>
+      <p class="share-note">Quiconque ouvre ce lien verra la configuration exacte et les résultats de cette simulation. Le lien fonctionne sans compte.</p>
     </div>
   </div>
 </div>
@@ -334,7 +380,11 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
 
   <!-- RÉSULTATS -->
   <div class="card c-res" id="res-panel">
-    <div class="ch"><div class="ch-icon" style="background:var(--purple-bg)">📊</div><span class="ch-title" style="color:#b0a0f8">Résultats</span></div>
+    <div class="ch">
+      <div class="ch-icon" style="background:var(--purple-bg)">📊</div>
+      <span class="ch-title" style="color:#b0a0f8">Résultats</span>
+      <button class="btn-spy" id="btn-share" onclick="openShare()" style="margin-left:auto">🔗 Partager</button>
+    </div>
     <div class="cb">
       <div class="res-inner">
         <div class="rc">
@@ -955,6 +1005,20 @@ function applyResults(d,ab,db,totAtk,totDef){
   document.getElementById('log-body').innerHTML=lastLog.map(l=>`<span class="ll"><span class="lg">[${l.split('→')[0].trim()}]</span><span class="lcr"> → </span>${l.split('→')[1]||''}</span>`).join('');
   document.getElementById('res-panel').classList.add('v');
   document.getElementById('log-panel').classList.add('v');
+
+  /* Sauvegarder l'état pour le partage */
+  _lastShareState = {
+    aw, dw, dr,
+    ap, dp, rp, ar,
+    ap2, dp2,
+    atk_fer:ff(af), atk_sil:ff(asil), atk_xen:ff(ax),
+    def_fer:ff(df), def_sil:ff(dsil), def_xen:ff(dx),
+    deb_fer:ff((af+df)*.30), deb_sil:ff((asil+dsil)*.30),
+    loot_fer:ff(lootFer), loot_sil:ff(lootSil), loot_xen:ff(lootXen),
+    tbl_atk: document.getElementById('tbl-atk').innerHTML,
+    tbl_def: document.getElementById('tbl-def').innerHTML,
+    log: document.getElementById('log-body').innerHTML,
+  };
 }
 
 function survTable(id,fleet,survivors,n,side){
@@ -970,6 +1034,153 @@ function survTable(id,fleet,survivors,n,side){
   });
   h+='</table>';c.innerHTML=h;
 }
+
+/* ══════════════════════════════════════════════════════
+   PARTAGE — encode config+résultats dans le hash URL
+══════════════════════════════════════════════════════ */
+
+/* État global des derniers résultats pour le partage */
+let _lastShareState = null;
+
+function encodeState(){
+  /* Config ATK */
+  const atkUnits={};
+  SHIPS.forEach(u=>{ const v=gv('atk-'+u.id); if(v) atkUnits[u.id]=v; });
+
+  /* Config DEF */
+  const defUnits={};
+  [...SHIPS,...DEFS].forEach(u=>{ const v=gv('def-'+u.id); if(v) defUnits[u.id]=v; });
+
+  const cfg={
+    aw: gv('atk-weapons'), as: gv('atk-shield'), aa: gv('atk-armor'),
+    dw: gv('def-weapons'), ds: gv('def-shield'), da: gv('def-armor'),
+    pf: gv('planet-fer'),  ps: gv('planet-sil'), px: gv('planet-xen'),
+    au: atkUnits, du: defUnits,
+  };
+
+  const state={ cfg, res: _lastShareState };
+  const json = JSON.stringify(state);
+  return btoa(unescape(encodeURIComponent(json)));
+}
+
+function decodeState(hash){
+  try{
+    const json = decodeURIComponent(escape(atob(hash)));
+    return JSON.parse(json);
+  }catch(e){ return null; }
+}
+
+function openShare(){
+  if(!_lastShareState){ return; }
+  const encoded = encodeState();
+  const url = location.href.split('#')[0] + '#' + encoded;
+  document.getElementById('share-url').value = url;
+  document.getElementById('btn-copy').textContent = 'Copier';
+  document.getElementById('btn-copy').classList.remove('copied');
+  document.getElementById('share-back').classList.add('open');
+}
+
+function closeShare(e){
+  if(e && e.target !== document.getElementById('share-back')) return;
+  document.getElementById('share-back').classList.remove('open');
+}
+
+function copyShareUrl(){
+  const input = document.getElementById('share-url');
+  navigator.clipboard.writeText(input.value).then(()=>{
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = '✓ Copié !';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Copier'; btn.classList.remove('copied'); }, 2000);
+  }).catch(()=>{
+    input.select();
+    document.execCommand('copy');
+  });
+}
+
+/* ── Restauration depuis le hash au chargement de la page ── */
+function restoreFromHash(){
+  const hash = location.hash.slice(1);
+  if(!hash) return;
+
+  const state = decodeState(hash);
+  if(!state || !state.cfg || !state.res) return;
+
+  const { cfg, res } = state;
+
+  /* Remplir les techs */
+  ['atk-weapons','atk-shield','atk-armor','def-weapons','def-shield','def-armor'].forEach((id,i)=>{
+    const vals=[cfg.aw,cfg.as,cfg.aa,cfg.dw,cfg.ds,cfg.da];
+    const el=document.getElementById(id);
+    if(el) el.value=vals[i]||0;
+  });
+
+  /* Remplir ressources planète */
+  if(document.getElementById('planet-fer')) document.getElementById('planet-fer').value=cfg.pf||0;
+  if(document.getElementById('planet-sil')) document.getElementById('planet-sil').value=cfg.ps||0;
+  if(document.getElementById('planet-xen')) document.getElementById('planet-xen').value=cfg.px||0;
+
+  /* Remplir unités ATK */
+  Object.entries(cfg.au||{}).forEach(([id,v])=>{
+    const el=document.getElementById('atk-'+id);
+    if(el){ el.value=v; el.closest('.urow')?.classList.toggle('on',v>0); }
+  });
+
+  /* Remplir unités DEF */
+  Object.entries(cfg.du||{}).forEach(([id,v])=>{
+    const el=document.getElementById('def-'+id);
+    if(el){ el.value=v; el.closest('.urow')?.classList.toggle('on',v>0); }
+  });
+
+  /* Restaurer les résultats visuels directement sans relancer la sim */
+  const r=res;
+
+  const out=document.getElementById('res-outcome');
+  if(r.aw>=r.dw&&r.aw>=r.dr){out.textContent='⚔ Victoire — Attaque';out.className='outcome o-atk';}
+  else if(r.dw>=r.aw&&r.dw>=r.dr){out.textContent='🛡 Victoire — Défense';out.className='outcome o-def';}
+  else{out.textContent='⚖ Égalité';out.className='outcome o-draw';}
+
+  document.getElementById('res-atk-pct').textContent=r.ap+'%';
+  document.getElementById('res-def-pct').textContent=r.dp+'%';
+  document.getElementById('res-draw-pct').textContent=r.rp+'%';
+  document.getElementById('res-rounds').textContent=r.ar;
+
+  document.getElementById('bar-atk').style.width=r.ap2+'%';
+  document.getElementById('bar-def').style.width=r.dp2+'%';
+  document.getElementById('pct-atk').textContent=r.ap2+'%';
+  document.getElementById('pct-def').textContent=r.dp2+'%';
+
+  document.getElementById('atk-fer').textContent=r.atk_fer;
+  document.getElementById('atk-sil').textContent=r.atk_sil;
+  document.getElementById('atk-xen').textContent=r.atk_xen;
+  document.getElementById('def-fer').textContent=r.def_fer;
+  document.getElementById('def-sil').textContent=r.def_sil;
+  document.getElementById('def-xen').textContent=r.def_xen;
+  document.getElementById('deb-fer').textContent=r.deb_fer;
+  document.getElementById('deb-sil').textContent=r.deb_sil;
+  document.getElementById('loot-fer').textContent=r.loot_fer;
+  document.getElementById('loot-sil').textContent=r.loot_sil;
+  document.getElementById('loot-xen').textContent=r.loot_xen;
+
+  /* Reconstruire les tables de survivants depuis les données sauvegardées */
+  if(r.tbl_atk) document.getElementById('tbl-atk').innerHTML=r.tbl_atk;
+  if(r.tbl_def) document.getElementById('tbl-def').innerHTML=r.tbl_def;
+
+  if(r.log) document.getElementById('log-body').innerHTML=r.log;
+
+  document.getElementById('res-panel').classList.add('v');
+  document.getElementById('log-panel').classList.add('v');
+
+  /* Marquer comme rapport partagé (lecture seule) */
+  _lastShareState = r;
+  const banner = document.createElement('div');
+  banner.style.cssText='grid-column:1/-1;background:var(--purple-bg);border:1px solid var(--purple-bd);border-radius:var(--r-md);padding:10px 16px;font-size:12px;color:#b0a0f8;text-align:center;';
+  banner.innerHTML='📋 Rapport partagé — <strong>relance la simulation</strong> pour obtenir de nouveaux résultats';
+  document.querySelector('.sim-row').after(banner);
+}
+
+/* Lancer la restauration après construction du DOM */
+document.addEventListener('DOMContentLoaded', restoreFromHash);
 </script>
 </body>
 </html>
