@@ -413,7 +413,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
             <div class="rb"><div class="ri" style="color:var(--c-sil)">Si</div><div class="rv2" id="atk-sil">0</div><div class="rk">Silice</div></div>
             <div class="rb"><div class="ri" style="color:var(--c-xen)">Xg</div><div class="rv2" id="atk-xen">0</div><div class="rk">Xenogas</div></div>
           </div>
-          <div class="rt" style="margin-top:8px">Pertes — Défense</div>
+          <div class="rt" style="margin-top:8px">Pertes — Défense <span style="font-weight:400;opacity:.6">(30% perm. après reconstruction)</span></div>
           <div class="rg">
             <div class="rb"><div class="ri" style="color:var(--c-fer)">Fe</div><div class="rv2" id="def-fer">0</div><div class="rk">Fer</div></div>
             <div class="rb"><div class="ri" style="color:var(--c-sil)">Si</div><div class="rv2" id="def-sil">0</div><div class="rk">Silice</div></div>
@@ -850,10 +850,23 @@ self.onmessage=function(e){
       as2[u.id]+=surv;
       atkLossDist[u.id].push(u.origCount-surv);
     });
+    /* IDs de défenses pour le taux de reconstruction */
+    const defIdSet=new Set(['tourelle_c','canon_imp','canon_fais','canon_m','proj_ion','canon_sol','bouclier_p','bouclier_g']);
     db.forEach(u=>{
       const surv=res.defSurv[u.id]||0;
       ds2[u.id]+=surv;
-      defLossDist[u.id].push(u.origCount-surv);
+      const destroyed=u.origCount-surv;
+      let rebuilt=0, permLost=destroyed;
+      if(defIdSet.has(u.id)){
+        rebuilt=0;
+        for(let k=0;k<destroyed;k++){
+          if(Math.random()<0.70) rebuilt++;
+        }
+        permLost=destroyed-rebuilt;
+      }
+      /* remaining = survivants combat + reconstruits */
+      const remaining=surv+rebuilt;
+      defLossDist[u.id].push({destroyed, rebuilt, permLost, remaining});
     });
 
     if(i===n-1) lastLog=res.log;
@@ -971,12 +984,28 @@ function applyResults(d,ab,db,totAtk,totDef){
   document.getElementById('pct-atk').textContent=ap2+'%';
   document.getElementById('pct-def').textContent=dp2+'%';
 
-  survTable('tbl-atk',ab,as2,n,'atk');
-  survTable('tbl-def',db,ds2,n,'def');
+  survTable('tbl-atk',ab,as2,n,'atk',null);
+  survTable('tbl-def',db,ds2,n,'def',d.dist?.defLoss);
 
   let af=0,asil=0,ax=0,df=0,dsil=0,dx=0;
   ab.forEach(u=>{const l=u.origCount-(as2[u.id]||0)/n;af+=l*u.fer;asil+=l*u.sil;ax+=l*(u.xen||0);});
-  db.forEach(u=>{const l=u.origCount-(ds2[u.id]||0)/n;df+=l*u.fer;dsil+=l*u.sil;dx+=l*(u.xen||0);});
+
+  /* Reconstruction des défenses : roll 70% individuel dans le Worker
+     → on utilise la moyenne des permLost depuis la distribution */
+  const REBUILD_RATE = 0.70;
+  const defIds = new Set(DEFS.map(d=>d.id));
+  db.forEach(u=>{
+    const lostAvg = u.origCount - (ds2[u.id]||0)/n;
+    let effectiveLoss = lostAvg;
+    if(defIds.has(u.id) && d.dist?.defLoss?.[u.id]){
+      /* Moyenne des pertes permanentes réelles (avec rolls individuels) */
+      const permArr = d.dist.defLoss[u.id].map(x=>x.permLost);
+      effectiveLoss = permArr.reduce((a,b)=>a+b,0)/permArr.length;
+    }
+    df   += effectiveLoss * u.fer;
+    dsil += effectiveLoss * u.sil;
+    dx   += effectiveLoss * (u.xen||0);
+  });
 
   /* Pertes en ressources */
   document.getElementById('atk-fer').textContent=ff(af);
@@ -1146,6 +1175,7 @@ function renderDistribution(dist, ab, db){
 
   /* Table DEF */
   const defUnits = db.filter(u=>u.origCount>0);
+  const DEF_ID_SET=new Set(['tourelle_c','canon_imp','canon_fais','canon_m','proj_ion','canon_sol','bouclier_p','bouclier_g']);
   if(defUnits.length){
     html += `
     <div style="grid-column:1/-1;background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px">
@@ -1166,22 +1196,43 @@ function renderDistribution(dist, ab, db){
           <tbody>`;
 
     defUnits.forEach((u,ri)=>{
-      const arr=dist.defLoss[u.id]||[];
-      if(!arr.length)return;
-      const mn=Math.min(...arr),p25=pct(arr,25),med=pct(arr,50),p75=pct(arr,75),mx=Math.max(...arr),avg=mean(arr);
-      const allZero=mx===0;
+      const raw=dist.defLoss[u.id]||[];
+      if(!raw.length)return;
+      const isDefense=DEF_ID_SET.has(u.id);
       const bg=ri%2===0?'transparent':'rgba(255,255,255,.02)';
-      html+=`<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.04)">
-        <td style="padding:8px 8px;color:var(--text);font-weight:500">${u.name}</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--text3)">${u.origCount}</td>
-        <td style="padding:8px 8px;text-align:center;color:${allZero?'var(--text3)':mn>0?'var(--red)':'var(--green)'};font-weight:700">${mn}</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${p25}</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--yellow);font-weight:700;font-size:13px">${med}</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${p75}</td>
-        <td style="padding:8px 8px;text-align:center;color:${mx>0?'var(--red)':'var(--green)'};font-weight:700">${mx}</td>
-        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${avg.toFixed(1)}</td>
-        <td style="padding:8px 16px 8px 8px">${sparkline(arr,'var(--green)',u.origCount)}</td>
-      </tr>`;
+
+      /* Arrays indépendants — chaque variable a ses propres MIN/MÉD/MAX */
+      const arrDest    = raw.map(d=>typeof d==='object'?d.destroyed:d);
+      const arrRebuilt = raw.map(d=>typeof d==='object'?(d.rebuilt||0):0);
+      const arrRemain  = raw.map(d=>typeof d==='object'?(d.remaining||u.origCount-d.permLost):u.origCount-d);
+
+      const statRow=(arr,color,label,pad1,pad2,showSparkline,total)=>{
+        const mn=Math.min(...arr),p25v=pct(arr,25),med=pct(arr,50),
+              p75v=pct(arr,75),mx=Math.max(...arr),avg=mean(arr);
+        return `<tr style="background:${bg}${label==='✓ restants'?';border-bottom:1px solid rgba(255,255,255,.08)':''}">
+          <td style="padding:${pad1} 8px ${pad2} ${label==='Canon de Masse'||label===u.name?'8px':'16px'};color:${color};font-size:${label===u.name?'12px':'11px'};font-weight:${label===u.name?'600':'400'};font-style:${label===u.name?'normal':'italic'}">${label}</td>
+          <td style="padding:${pad1} 8px ${pad2} 8px;text-align:center;color:var(--text3);font-size:11px">${label===u.name?u.origCount:'—'}</td>
+          <td style="padding:${pad1} 8px ${pad2} 8px;text-align:center;color:${color};font-weight:600;font-size:11px">${mn.toFixed(0)}</td>
+          <td style="padding:${pad1} 8px ${pad2} 8px;text-align:center;color:${color};font-size:11px;opacity:.7">${p25v.toFixed(0)}</td>
+          <td style="padding:${pad1} 8px ${pad2} 8px;text-align:center;color:${color};font-weight:700;font-size:${label===u.name?'13px':'12px'}">${med.toFixed(0)}</td>
+          <td style="padding:${pad1} 8px ${pad2} 8px;text-align:center;color:${color};font-size:11px;opacity:.7">${p75v.toFixed(0)}</td>
+          <td style="padding:${pad1} 8px ${pad2} 8px;text-align:center;color:${color};font-weight:600;font-size:11px">${mx.toFixed(0)}</td>
+          <td style="padding:${pad1} 8px ${pad2} 8px;text-align:center;color:${color};font-size:11px;opacity:.8">${avg.toFixed(1)}</td>
+          <td style="padding:${pad1} 16px ${pad2} 8px">${showSparkline?sparkline(arr,color,total):''}</td>
+        </tr>`;
+      };
+
+      /* Ligne 1 : Détruits pendant le combat */
+      html += statRow(arrDest,'var(--red)',u.name,'7px','2px',true,u.origCount);
+
+      if(isDefense){
+        /* Ligne 2 : Reconstruits (70% roll) */
+        html += statRow(arrRebuilt,'var(--green)','↩ reconstruits','2px','2px',true,u.origCount);
+        /* Ligne 3 : Restants total = survivants + reconstruits */
+        html += statRow(arrRemain,'var(--blue)','✓ restants total','2px','7px',true,u.origCount);
+      } else {
+        html+=`<tr style="border-bottom:1px solid rgba(255,255,255,.06)"><td colspan="9" style="padding:0 0 4px 0"></td></tr>`;
+      }
     });
     html+=`</tbody></table></div></div>`;
   }
@@ -1190,17 +1241,51 @@ function renderDistribution(dist, ab, db){
   document.getElementById('dist-panel').style.display='block';
 }
 
-function survTable(id,fleet,survivors,n,side){
+function survTable(id,fleet,survivors,n,side,defLossDist){
   const c=document.getElementById(id);
   if(!fleet.length){c.innerHTML='';return;}
   const col=side==='atk'?'var(--orange)':'var(--green)';
-  let h=`<div style="font-size:9px;color:${col};letter-spacing:2px;margin-bottom:4px;text-transform:uppercase">${side==='atk'?'Attaque':'Défense'} — Unités</div>`;
-  h+=`<table class="stbl"><tr><th>Unité</th><th style="text-align:right">Init.</th><th style="text-align:right">Surv.</th><th style="text-align:right">Pertes</th></tr>`;
-  fleet.forEach(u=>{
-    const avg=(survivors[u.id]||0)/n;
-    const lost=u.origCount-avg;
-    h+=`<tr><td>${u.name}</td><td class="rv">${u.origCount}</td><td class="rv sv">${avg.toFixed(1)}</td><td class="rv ls">${lost.toFixed(1)}</td></tr>`;
-  });
+  const isDefSide = side==='def';
+  const defIdSet=new Set(['tourelle_c','canon_imp','canon_fais','canon_m','proj_ion','canon_sol','bouclier_p','bouclier_g']);
+
+  let h=`<div style="font-size:9px;color:${col};letter-spacing:2px;margin-bottom:4px;text-transform:uppercase">${isDefSide?'Défense':'Attaque'} — Unités</div>`;
+
+  if(isDefSide){
+    h+=`<table class="stbl">
+      <tr>
+        <th>Unité</th>
+        <th style="text-align:right">Init.</th>
+        <th style="text-align:right">Détruits</th>
+        <th style="text-align:right;color:var(--green)">Reconstruits</th>
+        <th style="text-align:right;color:var(--red)">Perdus déf.</th>
+      </tr>`;
+    fleet.forEach(u=>{
+      const avgSurv=(survivors[u.id]||0)/n;
+      const avgDestroyed=u.origCount-avgSurv;
+      const isDefense=defIdSet.has(u.id);
+      let avgPerm=avgDestroyed, avgRebuilt=0;
+      if(isDefense && defLossDist && defLossDist[u.id]){
+        const permArr=defLossDist[u.id].map(d=>d.permLost);
+        avgPerm=permArr.reduce((a,b)=>a+b,0)/permArr.length;
+        avgRebuilt=avgDestroyed-avgPerm;
+      }
+      h+=`<tr>
+        <td>${u.name}</td>
+        <td class="rv">${u.origCount}</td>
+        <td class="rv ls">${avgDestroyed.toFixed(1)}</td>
+        <td class="rv sv">${isDefense?avgRebuilt.toFixed(1):'—'}</td>
+        <td class="rv ls" style="color:var(--red)">${avgPerm.toFixed(1)}</td>
+      </tr>`;
+    });
+  } else {
+    h+=`<table class="stbl">
+      <tr><th>Unité</th><th style="text-align:right">Init.</th><th style="text-align:right">Surv.</th><th style="text-align:right">Pertes</th></tr>`;
+    fleet.forEach(u=>{
+      const avg=(survivors[u.id]||0)/n;
+      const lost=u.origCount-avg;
+      h+=`<tr><td>${u.name}</td><td class="rv">${u.origCount}</td><td class="rv sv">${avg.toFixed(1)}</td><td class="rv ls">${lost.toFixed(1)}</td></tr>`;
+    });
+  }
   h+='</table>';c.innerHTML=h;
 }
 
