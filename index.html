@@ -374,7 +374,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
 
   <!-- SIM ROW -->
   <div class="sim-row">
-    <div class="ss"><span class="ss-lbl">Simulations</span><input type="number" class="sn" id="sim-count" value="100" min="1" max="1000"></div>
+    <div class="ss"><span class="ss-lbl" style="color:var(--text3)">1 000 simulations</span><span style="font-size:10px;color:var(--text3)">statistiquement stable</span></div>
     <button class="btn-sim" onclick="runSim()">Lancer la Bataille</button>
   </div>
 
@@ -441,6 +441,16 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
   <div class="card c-log" id="log-panel">
     <div class="ch"><div class="ch-icon">📜</div><span class="ch-title" style="color:var(--blue)">Journal — Dernière Simulation</span></div>
     <div class="log-body" id="log-body"></div>
+  </div>
+
+  <!-- DISTRIBUTION -->
+  <div class="card c-log" id="dist-panel" style="display:none">
+    <div class="ch">
+      <div class="ch-icon" style="background:var(--blue-bg)">📈</div>
+      <span class="ch-title" style="color:var(--blue)">Distribution sur 1 000 simulations</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:8px">min · P10 · médiane · P90 · max</span>
+    </div>
+    <div class="cb" id="dist-body" style="display:flex;flex-direction:column;gap:14px"></div>
   </div>
 
 </div>
@@ -816,7 +826,16 @@ self.onmessage=function(e){
   ab.forEach(u=>as2[u.id]=0);
   db.forEach(u=>ds2[u.id]=0);
   let lastLog=[];
-  const CHUNK=10; // envoyer progression toutes les 10 sims
+  const CHUNK=25;
+
+  const totAtk=ab.reduce((s,u)=>s+u.count,0);
+  const totDef=db.reduce((s,u)=>s+u.count,0);
+
+  /* Distributions par unité : pertes par sim */
+  const atkLossDist={}, defLossDist={};
+  ab.forEach(u=>atkLossDist[u.id]=[]);
+  db.forEach(u=>defLossDist[u.id]=[]);
+  const roundsDist=[];
 
   for(let i=0;i<n;i++){
     const res=simulate(ab.map(u=>({...u})),db.map(u=>({...u})));
@@ -824,24 +843,34 @@ self.onmessage=function(e){
     else if(res.winner==='def')dw++;
     else dr++;
     tr+=res.rounds;
-    ab.forEach(u=>{ as2[u.id]+=(res.atkSurv[u.id]||0); });
-    db.forEach(u=>{ ds2[u.id]+=(res.defSurv[u.id]||0); });
-    if(i===n-1) lastLog=res.log;
+    roundsDist.push(res.rounds);
 
+    ab.forEach(u=>{
+      const surv=res.atkSurv[u.id]||0;
+      as2[u.id]+=surv;
+      atkLossDist[u.id].push(u.origCount-surv);
+    });
+    db.forEach(u=>{
+      const surv=res.defSurv[u.id]||0;
+      ds2[u.id]+=surv;
+      defLossDist[u.id].push(u.origCount-surv);
+    });
+
+    if(i===n-1) lastLog=res.log;
     if((i+1)%CHUNK===0||(i+1)===n){
-      self.postMessage({type:'progress',done:i+1,total:n,
-        aw,dw,dr,       // live stats
-      });
+      self.postMessage({type:'progress',done:i+1,total:n,aw,dw,dr});
     }
   }
-  self.postMessage({type:'done',aw,dw,dr,tr,as2,ds2,lastLog,n});
+  self.postMessage({type:'done',aw,dw,dr,tr,as2,ds2,lastLog,n,
+    dist:{atkLoss:atkLossDist, defLoss:defLossDist, rounds:roundsDist}
+  });
 };
 `;
 
 let activeWorker=null;
 
 function runSim(){
-  const n    = gv('sim-count')||100;
+  const n    = 1000;
   const aw   = gv('atk-weapons'), as_ = gv('atk-shield'), aa = gv('atk-armor');
   const dw   = gv('def-weapons'), ds  = gv('def-shield'), da = gv('def-armor');
 
@@ -886,6 +915,7 @@ function runSim(){
       document.getElementById('loading').classList.remove('on');
       activeWorker=null;
       applyResults(d, ab, db, totAtk, totDef);
+      renderDistribution(d.dist, ab, db);
     }
   };
 
@@ -1019,6 +1049,145 @@ function applyResults(d,ab,db,totAtk,totDef){
     tbl_def: document.getElementById('tbl-def').innerHTML,
     log: document.getElementById('log-body').innerHTML,
   };
+}
+
+/* ══════════════════════════════════════════════════════
+   DISTRIBUTION — pertes par unité avec sparkline
+══════════════════════════════════════════════════════ */
+
+function pct(arr, p){
+  const s=[...arr].sort((a,b)=>a-b);
+  return s[Math.max(0,Math.floor(s.length*p/100)-1)]||0;
+}
+function mean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+
+/* Sparkline horizontal : segments colorés MIN→P25→MED→P75→MAX */
+function sparkline(arr, color, total){
+  const mn=Math.min(...arr), mx=Math.max(...arr);
+  const p25=pct(arr,25), med=pct(arr,50), p75=pct(arr,75), avg=mean(arr);
+  if(mx===0) return `<div style="width:100%;height:8px;background:var(--card3);border-radius:4px;opacity:.3"></div>`;
+
+  const scale = v => total>0 ? Math.round(v/total*100) : Math.round(v/mx*100);
+  /* barre de fond gris total */
+  /* zones colorées : P25→P75 = couleur vive, min→P25 et P75→max = couleur dim */
+  const pMin=scale(mn), pP25=scale(p25), pMed=scale(med), pP75=scale(p75), pMax=scale(mx);
+
+  return `
+  <div style="position:relative;width:100%;height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">
+    <div style="position:absolute;left:${pMin}%;width:${pMax-pMin}%;height:100%;background:${color};opacity:.25;border-radius:4px"></div>
+    <div style="position:absolute;left:${pP25}%;width:${Math.max(1,pP75-pP25)}%;height:100%;background:${color};opacity:.8;border-radius:2px"></div>
+    <div style="position:absolute;left:${pMed}%;width:2px;height:100%;background:#fff;opacity:.9"></div>
+  </div>`;
+}
+
+function renderDistribution(dist, ab, db){
+  if(!dist||!dist.atkLoss||!dist.defLoss) return;
+
+  const body = document.getElementById('dist-body');
+
+  /* Section rounds */
+  const rounds = dist.rounds;
+  const rMn=Math.min(...rounds),rMx=Math.max(...rounds),rMed=pct(rounds,50),rAvg=mean(rounds);
+
+  let html = `
+  <div style="grid-column:1/-1;background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px">
+    <div style="font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Rounds de combat</div>
+    <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+      ${[['MIN',rMn,'var(--red)'],['MÉDIANE',rMed,'var(--yellow)'],['MOYENNE',rAvg.toFixed(1),'var(--text2)'],['MAX',rMx,'var(--green)']].map(([l,v,c])=>`
+        <div style="text-align:center">
+          <div style="font-size:9px;font-weight:600;color:${c};letter-spacing:.5px">${l}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--text);line-height:1.2">${v}</div>
+        </div>`).join('')}
+      <div style="flex:1;min-width:120px">${sparkline(rounds,'var(--yellow)',6)}</div>
+    </div>
+  </div>`;
+
+  /* Table ATK */
+  const atkUnits = ab.filter(u=>u.origCount>0);
+  if(atkUnits.length){
+    html += `
+    <div style="grid-column:1/-1;background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px">
+      <div style="font-size:10px;font-weight:600;color:var(--orange);letter-spacing:.8px;text-transform:uppercase;margin-bottom:12px">⚔ Pertes Attaque — par unité</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.5px">Unité</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3)">Qté</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--red)">MIN</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3)">P25</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--yellow)">MÉD.</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3)">P75</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--green)">MAX</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text2)">MOY.</th>
+            <th style="padding:6px 8px;min-width:100px;font-size:10px;font-weight:600;color:var(--text3)">Distribution</th>
+          </tr></thead>
+          <tbody>`;
+
+    atkUnits.forEach((u,ri)=>{
+      const arr=dist.atkLoss[u.id]||[];
+      if(!arr.length)return;
+      const mn=Math.min(...arr),p25=pct(arr,25),med=pct(arr,50),p75=pct(arr,75),mx=Math.max(...arr),avg=mean(arr);
+      const allZero=mx===0;
+      const bg=ri%2===0?'transparent':'rgba(255,255,255,.02)';
+      html+=`<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.04)">
+        <td style="padding:8px 8px;color:var(--text);font-weight:500">${u.name}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text3)">${u.origCount}</td>
+        <td style="padding:8px 8px;text-align:center;color:${allZero?'var(--text3)':mn>0?'var(--red)':'var(--green)'};font-weight:700">${mn}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${p25}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--yellow);font-weight:700;font-size:13px">${med}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${p75}</td>
+        <td style="padding:8px 8px;text-align:center;color:${mx>0?'var(--red)':'var(--green)'};font-weight:700">${mx}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${avg.toFixed(1)}</td>
+        <td style="padding:8px 16px 8px 8px">${sparkline(arr,'var(--orange)',u.origCount)}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div></div>`;
+  }
+
+  /* Table DEF */
+  const defUnits = db.filter(u=>u.origCount>0);
+  if(defUnits.length){
+    html += `
+    <div style="grid-column:1/-1;background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px">
+      <div style="font-size:10px;font-weight:600;color:var(--green);letter-spacing:.8px;text-transform:uppercase;margin-bottom:12px">🛡 Pertes Défense — par unité</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.5px">Unité</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3)">Qté</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--red)">MIN</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3)">P25</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--yellow)">MÉD.</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text3)">P75</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--green)">MAX</th>
+            <th style="text-align:center;padding:6px 8px;font-size:10px;font-weight:600;color:var(--text2)">MOY.</th>
+            <th style="padding:6px 8px;min-width:100px;font-size:10px;font-weight:600;color:var(--text3)">Distribution</th>
+          </tr></thead>
+          <tbody>`;
+
+    defUnits.forEach((u,ri)=>{
+      const arr=dist.defLoss[u.id]||[];
+      if(!arr.length)return;
+      const mn=Math.min(...arr),p25=pct(arr,25),med=pct(arr,50),p75=pct(arr,75),mx=Math.max(...arr),avg=mean(arr);
+      const allZero=mx===0;
+      const bg=ri%2===0?'transparent':'rgba(255,255,255,.02)';
+      html+=`<tr style="background:${bg};border-bottom:1px solid rgba(255,255,255,.04)">
+        <td style="padding:8px 8px;color:var(--text);font-weight:500">${u.name}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text3)">${u.origCount}</td>
+        <td style="padding:8px 8px;text-align:center;color:${allZero?'var(--text3)':mn>0?'var(--red)':'var(--green)'};font-weight:700">${mn}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${p25}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--yellow);font-weight:700;font-size:13px">${med}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${p75}</td>
+        <td style="padding:8px 8px;text-align:center;color:${mx>0?'var(--red)':'var(--green)'};font-weight:700">${mx}</td>
+        <td style="padding:8px 8px;text-align:center;color:var(--text2)">${avg.toFixed(1)}</td>
+        <td style="padding:8px 16px 8px 8px">${sparkline(arr,'var(--green)',u.origCount)}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div></div>`;
+  }
+
+  body.innerHTML = html;
+  document.getElementById('dist-panel').style.display='block';
 }
 
 function survTable(id,fleet,survivors,n,side){
