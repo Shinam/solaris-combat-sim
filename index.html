@@ -585,7 +585,7 @@ const RF={
 /* ═══════════════════════════════════════════════════════════
    MOTEUR v2 — Entités individuelles
    Chaque vaisseau/défense est un objet {typeId, hull, hullMax, sp, spMax, atk, bou}
-   • Explosion : si hull < 70% hullMax → prob (1 - hull/hullMax) à chaque tir reçu
+   • Explosion : si hull < 70% hullMax → prob (1 - hull/hullMax) — check en FIN DE ROUND
    • RF sur cibles potentiellement déjà mortes dans le round (comme OGame)
    • Bounce : ATK < 1% du bouclier ACTUEL de la cible → annulé
    • Unités mortes restent dans la liste jusqu'à fin de round (tirent encore)
@@ -646,82 +646,60 @@ function simulate(ab,db){
     rounds++;
     if(!countAlive(atk)||!countAlive(def)) break;
 
-    /* Marquer tous comme vivants pour ce round */
     atk.forEach(e=>e.dead=false);
     def.forEach(e=>e.dead=false);
 
-    /* Phase de tir — les deux côtés tirent simultanément
-       Les morts de ce round restent dans la liste (dead=true) jusqu'après le tir */
     firePhase(atk, def);
     firePhase(def, atk);
 
-    /* Fin de round : retirer les morts, régénérer boucliers des survivants */
+    /* ── EXPLOSION fin de round — un seul check par unité ── */
+    const explodeCheck=(fleet)=>{
+      fleet.forEach(e=>{
+        if(e.removed||e.dead) return;
+        if(e.hull<e.hullMax*0.7){
+          if(Math.random()>e.hull/e.hullMax){ e.hull=0; e.dead=true; }
+        }
+        if(e.hull<=0) e.dead=true;
+      });
+    };
+    explodeCheck(atk); explodeCheck(def);
+
+    /* Fin de round : retirer les morts, régénérer boucliers */
     atk.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
     def.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
 
     const ra=countAlive(atk), rd=countAlive(def);
     log.push(`Round ${r+1} → ATK: ${ra} | DEF: ${rd}`);
-
     if(!ra||!rd) break;
   }
 
   const al=countAlive(atk), dl=countAlive(def);
   const winner=al>0&&dl===0?'atk':dl>0&&al===0?'def':'draw';
-
-  /* Reconstruction défenses 70% — on recrée des entités pour les survivants def
-     Mais pour le comptage on utilise les vivants à l'issue du combat */
   return{winner, rounds, atkEntities:atk, defEntities:def, log};
 }
 
-/* ── Phase de tir d'un côté vers l'autre ── */
+/* ── Phase de tir ── */
 function firePhase(shooters, targets){
-  /* Les tireurs valides : non retirés (incluant dead=true de ce round) */
   const validShooters = shooters.filter(e=>!e.removed);
-  /* Les cibles valides : non retirés (incluant dead=true de ce round — OGame exact) */
-  const validTargets  = targets.filter(e=>!e.removed);
-  if(!validShooters.length||!validTargets.length) return;
+  if(!validShooters.length) return;
 
   validShooters.forEach(sh=>{
     const rfMap=RF[sh.typeId]||{};
     let shooting=true;
-
     while(shooting){
-      /* Choisir cible aléatoire parmi toutes les non-retirées (y compris dead) */
-      const pool=targets.filter(e=>!e.removed);
+      /* Pool : hull > 0 et pas dead — Solaris exact */
+      const pool=targets.filter(e=>!e.removed&&!e.dead&&e.hull>0);
       if(!pool.length) break;
       const t=pool[Math.floor(Math.random()*pool.length)];
 
-      /* ── BOUNCE : ATK < 1% du bouclier ACTUEL de la cible ── */
-      if(sh.atk >= t.sp*0.01){
-        /* Dégâts */
-        if(sh.atk<=t.sp){
-          /* Bouclier absorbe tout */
-          t.sp-=sh.atk;
-        } else {
-          /* Bouclier tombe à 0, excédent en hull */
-          const excess=sh.atk-t.sp;
-          t.sp=0;
-          t.hull-=excess;
-          if(t.hull<0) t.hull=0;
-        }
-
-        /* ── EXPLOSION aléatoire ──
-           Évaluée à chaque tir reçu si hull < 70% hullMax
-           Prob = 1 - hull/hullMax */
-        if(!t.dead && t.hull < t.hullMax*0.7){
-          if(Math.random() > t.hull/t.hullMax){
-            t.hull=0;
-            t.dead=true;  /* explose — reste dans la liste jusqu'à fin de round */
-          }
-        }
-        /* Hull à 0 sans explosion → mort aussi */
+      /* BOUNCE : bouclier MAX fixe pour tout le round */
+      if(sh.atk>=t.bou*0.01){
+        if(sh.atk<=t.sp){ t.sp-=sh.atk; }
+        else{ const ex=sh.atk-t.sp; t.sp=0; t.hull-=ex; if(t.hull<0)t.hull=0; }
         if(t.hull<=0) t.dead=true;
       }
-
-      /* ── RAPIDFIRE ──
-         Prob tir suivant = (rf-1)/rf, ciblant n'importe quelle cible non-retirée */
       const rf=rfMap[t.typeId]||0;
-      shooting = rf>1 && Math.random()<(rf-1)/rf;
+      shooting=rf>1&&Math.random()<(rf-1)/rf;
     }
   });
 }
@@ -774,15 +752,14 @@ function firePhase(shooters,targets){
     const rfMap=RF[sh.typeId]||{};
     let shooting=true;
     while(shooting){
-      const pool=targets.filter(e=>!e.removed);
+      /* Pool : hull > 0 et pas dead — Solaris exact */
+      const pool=targets.filter(e=>!e.removed&&!e.dead&&e.hull>0);
       if(!pool.length) break;
       const t=pool[Math.floor(Math.random()*pool.length)];
-      if(sh.atk>=t.sp*0.01){
+      /* BOUNCE : bouclier MAX fixe pour tout le round */
+      if(sh.atk>=t.bou*0.01){
         if(sh.atk<=t.sp){ t.sp-=sh.atk; }
         else{ t.hull-=(sh.atk-t.sp); t.sp=0; if(t.hull<0)t.hull=0; }
-        if(!t.dead && t.hull<t.hullMax*0.7){
-          if(Math.random()>t.hull/t.hullMax){ t.hull=0; t.dead=true; }
-        }
         if(t.hull<=0) t.dead=true;
       }
       const rf=rfMap[t.typeId]||0;
@@ -801,6 +778,13 @@ function simulate(ab,db){
     atk.forEach(e=>e.dead=false);
     def.forEach(e=>e.dead=false);
     firePhase(atk,def); firePhase(def,atk);
+    /* EXPLOSION fin de round — un seul check par unité */
+    const expl=(fleet)=>fleet.forEach(e=>{
+      if(e.removed||e.dead) return;
+      if(e.hull<e.hullMax*0.7){ if(Math.random()>e.hull/e.hullMax){e.hull=0;e.dead=true;} }
+      if(e.hull<=0) e.dead=true;
+    });
+    expl(atk); expl(def);
     atk.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
     def.forEach(e=>{ if(e.dead)e.removed=true; else e.sp=e.bou; });
     atk=atk.filter(e=>!e.removed);
