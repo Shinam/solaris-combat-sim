@@ -603,7 +603,7 @@ const nameMap = {};
 });
 
 /* ─── MODAL ESPIONNAGE ─── */
-function openSpy()  { document.getElementById('spy-back').classList.add('open'); document.getElementById('spy-st').className='m-status'; }
+function openSpy()  { document.getElementById('spy-back').classList.add('open'); document.getElementById('spy-ta').value=''; document.getElementById('spy-st').className='m-status'; }
 function closeSpy(e){ if(e&&e.target!==document.getElementById('spy-back')) return; document.getElementById('spy-back').classList.remove('open'); }
 
 function parseSpy() {
