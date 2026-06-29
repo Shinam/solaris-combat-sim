@@ -256,9 +256,9 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
       <button class="m-close" onclick="closeSpy()">✕</button>
     </div>
     <div class="mb">
-      <p class="m-note">Collez le rapport d'espionnage. Les unités et défenses seront importées automatiquement dans la Flotte de Défense.</p>
-      <span class="m-label">Contenu du rapport</span>
-      <textarea class="m-ta" id="spy-ta" placeholder="Collez votre rapport ici…&#10;&#10;Format attendu (une unité par ligne) :&#10;  Nova Scout : 42&#10;  Canon de Masse : 15&#10;&#10;Le parseur sera affiné selon le format exact du jeu."></textarea>
+      <p class="m-note">Collez le rapport d'espionnage au format JSON. Les vaisseaux, défenses et ressources seront importés automatiquement dans la Flotte de Défense.</p>
+      <span class="m-label">Contenu du rapport (JSON)</span>
+      <textarea class="m-ta" id="spy-ta" placeholder='Collez votre rapport JSON ici…&#10;&#10;{ "game": "Solaris", "type": "espionage_report", ... }'></textarea>
       <div id="spy-st" class="m-status"></div>
       <div class="mf">
         <button class="btn-cancel" onclick="closeSpy()">Annuler</button>
@@ -340,7 +340,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
       <div class="ch-icon">🛡️</div>
       <span class="ch-title">Flotte de Défense</span>
       <span class="ch-pill">DEF</span>
-      <button class="btn-spy" disabled title="Disponible dès que le format du rapport d'espionnage est défini" style="opacity:.35;cursor:not-allowed">🔭 Rapport d'Espionnage</button>
+      <button class="btn-spy" onclick="openSpy()">🔭 Rapport d'Espionnage</button>
     </div>
     <div class="cb">
       <div class="tech-section">
@@ -546,7 +546,56 @@ function mr(inp) { inp.closest('.urow').classList.toggle('on', parseInt(inp.valu
 buildPanel('atk-units', 'atk', false);
 buildPanel('def-units', 'def', true);
 
-/* ─── NAME MAP pour parseur espionnage ─── */
+/* ─── MAPPING JSON → IDs simulateur ─── */
+/* Clés du rapport JSON (ships/buildings) → IDs internes du simulateur */
+const spyShipMap = {
+  'novaScout':       'nova_scout',
+  'ferDeLance':      'fer_de_lance',
+  'cyclone':         'cyclone',
+  'bastion':         'bastion',
+  'pyro':            'pyro',
+  'nemesis':         'nemesis',
+  'fulgurant':       'fulgurant',
+  'titanAstral':     'titan_astral',
+  'atlasCargo':      'atlas_cargo',
+  'atlasCargoXL':    'atlas_cargo_xl',
+  'atlasCargoXl':    'atlas_cargo_xl',
+  'colonyShip':      'barge_col',
+  'bargeCol':        'barge_col',
+  'bargeColoniale':  'barge_col',
+  'mantaRecup':      'manta_recup',
+  'spectreSonde':    'spectre_s',
+  'spectreS':        'spectre_s',
+  'heliosRemorqueur':'helios_r',
+  'heliosR':         'helios_r',
+};
+const spyDefMap = {
+  'kineticTurret':     'tourelle_c',
+  'tourelleCinetique': 'tourelle_c',
+  'tourelleC':         'tourelle_c',
+  'pulseCannon':       'canon_imp',
+  'canonImpulsion':    'canon_imp',
+  'canonImp':          'canon_imp',
+  'beamCannon':        'canon_fais',
+  'canonFaisceau':     'canon_fais',
+  'canonFais':         'canon_fais',
+  'ionProjector':      'proj_ion',
+  'projIon':           'proj_ion',
+  'massDriver':        'canon_m',
+  'canonMasse':        'canon_m',
+  'canonM':            'canon_m',
+  'solarCannon':       'canon_sol',
+  'canonSolaire':      'canon_sol',
+  'canonSol':          'canon_sol',
+  'petitBouclierPlan': 'bouclier_p',
+  'bouclierP':         'bouclier_p',
+  'smallShield':       'bouclier_p',
+  'grandBouclierPlan': 'bouclier_g',
+  'bouclierG':         'bouclier_g',
+  'largeShield':       'bouclier_g',
+};
+
+/* Fallback : nameMap textuel pour compatibilité */
 const nameMap = {};
 [...SHIPS, ...DEFS].forEach(u => {
   nameMap[u.name.toLowerCase()] = u.id;
@@ -561,21 +610,80 @@ function parseSpy() {
   const raw = document.getElementById('spy-ta').value.trim();
   const st  = document.getElementById('spy-st');
   if(!raw){ st.textContent='Aucun contenu.'; st.className='m-status err'; return; }
+
+  /* Reset tous les champs défense */
   [...SHIPS,...DEFS].forEach(u=>{ const el=document.getElementById('def-'+u.id); if(el){el.value=0;el.closest('.urow').classList.remove('on');} });
-  let found=0;
-  raw.split('\n').forEach(line=>{
-    line=line.trim();
-    const m=line.match(/^(.+?)[\s:x×*]+(\d[\d\s]*)$/i);
-    if(!m) return;
-    const rn=m[1].trim().toLowerCase().replace(/\s+/g,' ');
-    const qty=parseInt(m[2].replace(/\s/g,''));
-    if(!qty) return;
-    let id=nameMap[rn];
-    if(!id){ for(const[k,v] of Object.entries(nameMap)){ if(rn.includes(k)||k.includes(rn)){id=v;break;} } }
-    if(id){ const el=document.getElementById('def-'+id); if(el){el.value=qty;el.closest('.urow').classList.add('on');found++;} }
-  });
-  if(found>0){ st.textContent='✓ '+found+' type(s) importés.'; st.className='m-status ok'; setTimeout(()=>document.getElementById('spy-back').classList.remove('open'),1100); }
-  else { st.textContent='Format non reconnu.'; st.className='m-status err'; }
+
+  let report;
+  try { report = JSON.parse(raw); }
+  catch(e){ st.textContent='JSON invalide : '+e.message; st.className='m-status err'; return; }
+
+  if(!report || typeof report !== 'object'){
+    st.textContent='Format non reconnu (objet attendu).'; st.className='m-status err'; return;
+  }
+
+  let found = 0;
+  const details = [];
+
+  /* ── Import des vaisseaux (ships) ── */
+  if(report.ships && typeof report.ships === 'object'){
+    for(const [key, qty] of Object.entries(report.ships)){
+      if(!qty || qty <= 0) continue;
+      const id = spyShipMap[key] || spyDefMap[key];
+      if(id){
+        const el = document.getElementById('def-'+id);
+        if(el){ el.value = qty; el.closest('.urow').classList.add('on'); found++; details.push(qty+'x '+id); }
+      }
+    }
+  }
+
+  /* ── Import des défenses (defenses) ── */
+  if(report.defenses && typeof report.defenses === 'object'){
+    for(const [key, qty] of Object.entries(report.defenses)){
+      if(!qty || qty <= 0) continue;
+      const id = spyDefMap[key] || spyShipMap[key];
+      if(id){
+        const el = document.getElementById('def-'+id);
+        if(el){ el.value = qty; el.closest('.urow').classList.add('on'); found++; details.push(qty+'x '+id); }
+      }
+    }
+  }
+
+  /* ── Import des technologies de combat (défenseur) ── */
+  let techImported = false;
+  if(report.research && typeof report.research === 'object'){
+    const r = report.research;
+    if(r.weaponsTech != null) { document.getElementById('def-weapons').value = r.weaponsTech; techImported = true; }
+    if(r.shieldTech != null)  { document.getElementById('def-shield').value  = r.shieldTech;  techImported = true; }
+    if(r.armorTech != null)   { document.getElementById('def-armor').value   = r.armorTech;   techImported = true; }
+  }
+
+  /* ── Import des ressources ── */
+  let resImported = false;
+  if(report.resources && typeof report.resources === 'object'){
+    const r = report.resources;
+    if(r.fer != null)     { document.getElementById('planet-fer').value = Math.floor(r.fer);     resImported = true; }
+    if(r.silice != null)  { document.getElementById('planet-sil').value = Math.floor(r.silice);  resImported = true; }
+    if(r.novagas != null) { document.getElementById('planet-xen').value = Math.floor(r.novagas); resImported = true; }
+  }
+
+  /* ── Résumé ── */
+  const parts = [];
+  if(found > 0) parts.push(found+' type(s) d\'unités');
+  if(techImported) parts.push('techs');
+  if(resImported) parts.push('ressources');
+  if(report.target) parts.push('cible: '+report.target);
+  if(report.planet) parts.push('planète: '+report.planet);
+  if(report.coords) parts.push('['+report.coords.join(':')+']');
+
+  if(parts.length > 0){
+    st.textContent = '✓ Importé — '+parts.join(' · ');
+    st.className = 'm-status ok';
+    setTimeout(()=>document.getElementById('spy-back').classList.remove('open'), 1400);
+  } else {
+    st.textContent = 'Rapport reconnu mais aucune donnée exploitable (ships/defenses/resources vides).';
+    st.className = 'm-status err';
+  }
 }
 
 /* ─── MODAL PARTAGE ─── */
