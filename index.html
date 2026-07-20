@@ -147,6 +147,11 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
   font-family:'Inter',sans-serif;font-size:14px;font-weight:700;
   padding:9px 14px;width:90px;text-align:center;outline:none;border-radius:10px;transition:border-color .2s}
 .sn:focus{border-color:var(--yellow-bd)}
+.sim-opts{display:flex;gap:6px}
+.sim-opt{font-family:'Inter',sans-serif;font-size:12px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--card2);color:var(--text2);transition:all .2s}
+.sim-opt:hover{border-color:var(--border);color:var(--text)}
+.sim-opt.on{border-color:var(--yellow-bd);background:rgba(240,184,64,.1);color:var(--yellow)}
 .btn-sim{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
   color:var(--green);background:transparent;
   border:1.5px solid var(--green-bd);border-radius:14px;
@@ -374,7 +379,15 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
 
   <!-- SIM ROW -->
   <div class="sim-row">
-    <div class="ss"><span class="ss-lbl" style="color:var(--text3)">1 000 simulations</span><span style="font-size:10px;color:var(--text3)">statistiquement stable</span></div>
+    <div class="ss">
+      <span class="ss-lbl" style="color:var(--text3)">Nombre de simulations</span>
+      <div class="sim-opts" id="sim-count-opts">
+        <button type="button" class="sim-opt" data-n="10" onclick="setSimCount(10)">10</button>
+        <button type="button" class="sim-opt" data-n="100" onclick="setSimCount(100)">100</button>
+        <button type="button" class="sim-opt on" data-n="1000" onclick="setSimCount(1000)">1 000</button>
+      </div>
+      <span id="sim-count-hint" style="font-size:10px;color:var(--text3)">statistiquement stable</span>
+    </div>
     <button class="btn-sim" onclick="runSim()">Lancer la Bataille</button>
   </div>
 
@@ -451,7 +464,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
   <div class="card c-log" id="dist-panel" style="display:none">
     <div class="ch">
       <div class="ch-icon" style="background:var(--blue-bg)">📈</div>
-      <span class="ch-title" style="color:var(--blue)">Distribution sur 1 000 simulations</span>
+      <span class="ch-title" style="color:var(--blue)" id="dist-title">Distribution</span>
       <span style="font-size:10px;color:var(--text3);margin-left:8px">min · P10 · médiane · P90 · max</span>
     </div>
     <div class="cb" id="dist-body" style="display:flex;flex-direction:column;gap:14px"></div>
@@ -903,7 +916,8 @@ self.onmessage=function(e){
     roundsDist.push(res.log.length);
     if(i===n-1) lastLog=res.log;
 
-    if((i+1)%25===0||(i+1)===n) self.postMessage({type:'progress',done:i+1,total:n,aw,dw,dr});
+    const progStep=Math.max(1,Math.floor(n/40));
+    if((i+1)%progStep===0||(i+1)===n) self.postMessage({type:'progress',done:i+1,total:n,aw,dw,dr});
   }
 
   self.postMessage({type:'done',aw,dw,dr,n,totRounds,
@@ -916,6 +930,17 @@ self.onmessage=function(e){
 
 /* ─── LANCER LA SIMULATION ─── */
 let activeWorker = null;
+let simCount = 1000;
+
+const SIM_COUNT_HINTS = {10:'rapide — aperçu', 100:'équilibré', 1000:'statistiquement stable'};
+function fmtSimCount(n){ return n.toLocaleString('fr-FR'); }
+
+function setSimCount(n){
+  simCount=n;
+  document.querySelectorAll('.sim-opt').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.n,10)===n));
+  const hint=document.getElementById('sim-count-hint');
+  if(hint) hint.textContent=SIM_COUNT_HINTS[n]||'';
+}
 
 function runSim() {
   const aw=gv('atk-weapons'), as_=gv('atk-shield'), aa=gv('atk-armor');
@@ -931,7 +956,7 @@ function runSim() {
   const el=id=>document.getElementById(id);
   el('loading').classList.add('on');
   el('prog-fill').style.width='0%';
-  el('prog-done').textContent='0 / 1000';
+  el('prog-done').textContent='0 / '+fmtSimCount(simCount);
   el('prog-pct').textContent='0%';
   el('prog-live').textContent='Initialisation…';
 
@@ -957,7 +982,7 @@ function runSim() {
     }
   };
   activeWorker.onerror=function(err){ console.error(err); el('loading').classList.remove('on'); };
-  activeWorker.postMessage({ab,db,n:1000});
+  activeWorker.postMessage({ab,db,n:simCount});
 }
 
 /* ─── RENDU RÉSULTATS ─── */
@@ -1039,6 +1064,8 @@ function renderResults(d, ab, db, totAtk, totDef) {
   renderLog(lastLog, ab, db);
 
   /* ── Distribution ── */
+  const distTitle=document.getElementById('dist-title');
+  if(distTitle) distTitle.textContent='Distribution sur '+fmtSimCount(n)+' simulation'+(n>1?'s':'');
   renderDistribution(atkLossDist, defLossDist, roundsDist, ab, db);
 
   el('res-panel').classList.add('v');
