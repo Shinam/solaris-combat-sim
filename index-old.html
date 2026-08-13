@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solaris — Simulateur de Combat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080a12;--bg2:#0d1020;--card:#111520;--card2:#171c2e;--card3:#1c2235;
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
+  --green:#2ecc8a;--green-bg:rgba(46,204,138,.12);--green-bd:rgba(46,204,138,.28);
+  --orange:#e07840;--orange-bg:rgba(224,120,64,.12);--orange-bd:rgba(224,120,64,.28);
+  --purple:#7c5af5;--purple-bg:rgba(124,90,245,.12);--purple-bd:rgba(124,90,245,.28);
+  --blue:#4a9eff;--blue-bg:rgba(74,158,255,.10);--blue-bd:rgba(74,158,255,.25);
+  --red:#e04a5a;--red-bg:rgba(224,74,90,.10);--red-bd:rgba(224,74,90,.25);
+  --yellow:#f0b840;--yellow-bg:rgba(240,184,64,.10);--yellow-bd:rgba(240,184,64,.28);
+  --text:#e8eaf2;--text2:#8890a8;--text3:#4a5268;
+  --r-lg:20px;--r-md:14px;--r-sm:10px;
+
+  /* Couleurs ressources — calquées sur l'app Solaris */
+  --c-fer:   #c8cdd8;   /* gris blanc neutre  */
+  --c-sil:   #9b7fe8;   /* violet/mauve       */
+  --c-xen:   #38b8e0;   /* bleu cyan          */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 40% at 50% -10%,rgba(46,204,138,.06) 0%,transparent 60%),
+  radial-gradient(ellipse 60% 50% at 100% 100%,rgba(124,90,245,.06) 0%,transparent 55%)}
+
+/* HEADER */
+header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgba(8,10,18,.96);
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200;backdrop-filter:blur(12px)}
+.logo-img{width:40px;height:40px;border-radius:12px;box-shadow:0 0 16px rgba(46,204,138,.2)}
+.logo-text{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;
+  font-size:22px;
+  letter-spacing:3px;
+  background:linear-gradient(105deg, #e8c060 0%, #d4902a 40%, #c0561a 70%, #a03028 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  text-shadow:none;
+}
+.logo-text span{ -webkit-text-fill-color:inherit; color:inherit; }
+.logo-sub{font-size:10px;color:#6a5a48;margin-top:2px;letter-spacing:.5px}
+.hdr-badge{margin-left:auto;background:var(--green-bg);border:1px solid var(--green-bd);color:var(--green);
+  font-size:10px;font-weight:600;padding:4px 12px;border-radius:20px;letter-spacing:.3px}
+
+/* LAYOUT */
+.main{max-width:1360px;margin:0 auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+
+/* card header */
+.ch{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.ch-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.c-atk .ch-icon{background:var(--orange-bg)}
+.c-def .ch-icon{background:var(--green-bg)}
+.c-res .ch-icon{background:var(--purple-bg)}
+.c-log .ch-icon{background:var(--blue-bg)}
+.ch-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px}
+.c-atk .ch-title{color:#f0a060}
+.c-def .ch-title{color:var(--green)}
+.c-res .ch-title{color:#b0a0f8}
+.ch-pill{font-size:9px;font-weight:700;letter-spacing:1px;padding:3px 9px;border-radius:20px;text-transform:uppercase}
+.c-atk .ch-pill{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange-bd)}
+.c-def .ch-pill{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+
+/* SPY BUTTON */
+.btn-spy{margin-left:auto;font-size:11px;font-weight:500;color:var(--text2);background:var(--card2);
+  border:1px solid var(--border2);padding:6px 12px;border-radius:8px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-spy:hover{color:var(--green);border-color:var(--green-bd);background:var(--green-bg)}
+
+.cb{padding:14px 16px}
+
+/* TECH */
+.tech-section{background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;margin-bottom:12px}
+.tech-section-lbl{font-size:10px;font-weight:600;letter-spacing:.8px;color:var(--text3);text-transform:uppercase;margin-bottom:10px}
+.tgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tf{display:flex;flex-direction:column;gap:4px}
+.tl{font-size:10px;color:var(--text3);font-weight:500}
+.ti{background:var(--card3);border:1px solid var(--border);color:var(--text);
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:500;
+  padding:7px 10px;border-radius:8px;outline:none;width:100%;transition:border-color .18s}
+.c-atk .ti:focus{border-color:var(--orange-bd)}
+.c-def .ti:focus{border-color:var(--green-bd)}
+
+/* UNITS */
+.ucat{font-size:10px;font-weight:600;letter-spacing:.8px;color:var(--text3);text-transform:uppercase;
+  margin:12px 0 7px;display:flex;align-items:center;gap:8px}
+.ucat::after{content:'';flex:1;height:1px;background:var(--border)}
+.ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:5px}
+.urow{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--card2);
+  border:1px solid var(--border);border-radius:var(--r-sm);
+  transition:border-color .15s,background .15s;position:relative;cursor:default}
+.urow:hover{border-color:var(--border2);background:var(--card3)}
+.c-atk .urow.on{border-color:var(--orange-bd);background:var(--orange-bg)}
+.c-def .urow.on{border-color:var(--green-bd);background:var(--green-bg)}
+.uname{flex:1;font-size:12px;font-weight:500;color:var(--text2);line-height:1.3}
+.uinput{background:transparent;border:none;border-bottom:1px solid var(--border2);
+  color:var(--text);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;
+  width:48px;text-align:right;padding:1px 2px;outline:none}
+.c-atk .uinput:focus{border-bottom-color:var(--orange)}
+.c-def .uinput:focus{border-bottom-color:var(--green)}
+.urow[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:0;
+  background:#0d1020;border:1px solid var(--border2);border-radius:var(--r-sm);
+  padding:8px 12px;font-family:'Inter',monospace;font-size:10px;color:var(--text2);
+  white-space:pre;z-index:300;min-width:170px;line-height:1.9;
+  pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+
+/* MODAL */
+.modal-back{position:fixed;inset:0;background:rgba(4,6,12,.88);z-index:500;display:none;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-back.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border2);border-radius:var(--r-lg);
+  width:560px;max-width:95vw;box-shadow:0 24px 64px rgba(0,0,0,.8);overflow:hidden}
+.mh{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border);background:var(--card2)}
+.m-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:var(--text)}
+.m-close{margin-left:auto;font-size:18px;color:var(--text3);cursor:pointer;background:none;border:none;
+  line-height:1;padding:2px 6px;border-radius:6px;transition:all .15s}
+.m-close:hover{color:var(--text);background:var(--border)}
+.mb{padding:18px}
+.m-note{font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6}
+.m-label{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px;display:block}
+.m-ta{width:100%;height:190px;background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);
+  color:var(--text);font-family:'Inter',monospace;font-size:11px;padding:10px 12px;resize:vertical;outline:none;line-height:1.8;transition:border-color .2s}
+.m-ta:focus{border-color:var(--green-bd)}
+.m-status{font-size:11px;font-weight:500;margin-top:10px;padding:8px 12px;border-radius:8px;display:none}
+.m-status.ok{display:block;color:var(--green);border:1px solid var(--green-bd);background:var(--green-bg)}
+.m-status.err{display:block;color:var(--red);border:1px solid var(--red-bd);background:var(--red-bg)}
+.mf{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.btn-cancel{font-size:12px;font-weight:600;color:var(--text2);background:var(--card2);
+  border:1px solid var(--border);border-radius:10px;padding:9px 20px;cursor:pointer;transition:all .2s}
+.btn-cancel:hover{color:var(--text);border-color:var(--border2)}
+.btn-val{font-size:12px;font-weight:700;color:#fff;background:var(--green);
+  border:none;border-radius:10px;padding:9px 24px;cursor:pointer;transition:opacity .2s}
+.btn-val:hover{opacity:.85}
+
+/* SIM ROW */
+.sim-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:20px;padding:4px 0}
+.ss{display:flex;flex-direction:column;align-items:center;gap:5px}
+.ss-lbl{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.5px;text-transform:uppercase}
+.sn{background:var(--card2);border:1px solid var(--border2);color:var(--yellow);
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:700;
+  padding:9px 14px;width:90px;text-align:center;outline:none;border-radius:10px;transition:border-color .2s}
+.sn:focus{border-color:var(--yellow-bd)}
+.sim-opts{display:flex;gap:6px}
+.sim-opt{font-family:'Inter',sans-serif;font-size:12px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--card2);color:var(--text2);transition:all .2s}
+.sim-opt:hover{border-color:var(--border);color:var(--text)}
+.sim-opt.on{border-color:var(--yellow-bd);background:rgba(240,184,64,.1);color:var(--yellow)}
+.btn-sim{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
+  color:var(--green);background:transparent;
+  border:1.5px solid var(--green-bd);border-radius:14px;
+  padding:13px 42px;cursor:pointer;
+  transition:background .2s,border-color .2s,color .2s;
+  letter-spacing:.2px;}
+.btn-sim:hover{background:var(--green-bg);border-color:var(--green);}
+.btn-sim:active{transform:scale(.98)}
+
+/* RESULTS */
+.c-res,.c-log{grid-column:1/-1;display:none}
+.c-res.v,.c-log.v{display:block}
+.res-inner{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.rc{background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+.rct{font-size:10px;font-weight:600;letter-spacing:.8px;color:var(--text3);text-transform:uppercase;margin-bottom:12px}
+.outcome{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:10px}
+.o-atk{color:var(--orange)}
+.o-def{color:var(--green)}
+.o-draw{color:var(--text2)}
+.wr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.wl{font-size:11px;font-weight:500}
+.wp{font-size:13px;font-weight:700}
+
+/* SURVIVAL */
+.sv-sec{margin-top:12px}
+.sv-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.sv-lbl{font-size:10px;font-weight:600;width:38px;color:var(--text3)}
+.sv-tr{flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.sv-fill{height:100%;border-radius:3px;transition:width .9s cubic-bezier(.23,1,.32,1)}
+.fa{background:linear-gradient(90deg,#b05018,var(--orange))}
+.fd{background:linear-gradient(90deg,#1a9960,var(--green))}
+.sv-pct{font-size:11px;font-weight:700;width:34px;text-align:right}
+
+/* SURVIVOR TABLE */
+.stbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.stbl th{color:var(--text3);font-weight:600;font-size:10px;padding:4px 6px;border-bottom:1px solid var(--border);text-align:left;letter-spacing:.5px}
+.stbl td{padding:4px 6px;border-bottom:1px solid var(--border);color:var(--text2)}
+.stbl tr:last-child td{border-bottom:none}
+.rv{text-align:right;font-weight:600;color:var(--text)}
+.rv.ls{color:var(--red)}
+.rv.sv{color:var(--green)}
+
+/* RESOURCES */
+.rt{font-size:10px;font-weight:600;letter-spacing:.8px;color:var(--text3);text-transform:uppercase;margin:10px 0 6px}
+.rg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.rb{background:var(--card3);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 5px;text-align:center}
+.ri{font-size:15px;margin-bottom:3px;font-weight:700}
+.rv2{font-size:11px;font-weight:700;color:var(--text)}
+.rk{font-size:9px;color:var(--text3);margin-top:2px;font-weight:500}
+
+/* LOG */
+.log-body{padding:10px 14px;max-height:500px;overflow-y:auto;font-family:'Inter',monospace;font-size:10px;color:var(--text3);line-height:2}
+.log-body::-webkit-scrollbar{width:3px}
+.log-body::-webkit-scrollbar-thumb{background:var(--card3);border-radius:2px}
+.ll{display:block}
+.lg{color:var(--yellow);font-weight:600}
+.lcr{color:var(--text3)}
+.lgr{color:var(--green)}
+
+/* SHARE MODAL */
+.share-modal-back{position:fixed;inset:0;background:rgba(4,6,12,.88);z-index:500;display:none;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.share-modal-back.open{display:flex}
+.share-modal{background:var(--card);border:1px solid var(--border2);border-radius:var(--r-lg);
+  width:480px;max-width:95vw;box-shadow:0 24px 64px rgba(0,0,0,.8);overflow:hidden}
+.share-banner{padding:20px 20px 16px;background:var(--card2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px}
+.share-banner-icon{width:38px;height:38px;border-radius:10px;background:var(--purple-bg);
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.share-banner-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:var(--text)}
+.share-banner-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.share-close{margin-left:auto;font-size:18px;color:var(--text3);cursor:pointer;background:none;border:none;
+  padding:2px 6px;border-radius:6px;transition:all .15s}
+.share-close:hover{color:var(--text);background:var(--border)}
+.share-body{padding:18px 20px}
+.share-url-wrap{display:flex;gap:8px;align-items:center}
+.share-url{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:10px;
+  color:var(--text2);font-family:'Inter',monospace;font-size:11px;padding:10px 12px;
+  outline:none;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn-copy{font-size:12px;font-weight:600;color:var(--purple);background:var(--purple-bg);
+  border:1px solid var(--purple-bd);border-radius:10px;padding:10px 16px;cursor:pointer;
+  transition:all .2s;white-space:nowrap;flex-shrink:0}
+.btn-copy:hover{background:rgba(124,90,245,.22)}
+.btn-copy.copied{color:var(--green);background:var(--green-bg);border-color:var(--green-bd)}
+.share-note{font-size:11px;color:var(--text3);margin-top:10px;line-height:1.6}
+.loading{position:fixed;inset:0;background:rgba(4,6,12,.92);display:none;align-items:center;
+  justify-content:center;flex-direction:column;gap:16px;z-index:600;backdrop-filter:blur(8px)}
+.loading.on{display:flex}
+.loading-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--text)}
+.loading-sub{font-size:11px;color:var(--text3);font-weight:500}
+.progress-wrap{width:320px;display:flex;flex-direction:column;gap:8px}
+.progress-bar-bg{width:100%;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#1a9960,var(--green),#3ee8a0);border-radius:3px;transition:width .15s linear}
+.progress-counts{display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:var(--text3)}
+
+@media(max-width:860px){.main{grid-template-columns:1fr}.res-inner{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- MODAL ESPIONNAGE -->
+<div class="modal-back" id="spy-back" onclick="closeSpy(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="mh">
+      <span style="font-size:18px">🔭</span>
+      <span class="m-title">Rapport d'Espionnage</span>
+      <button class="m-close" onclick="closeSpy()">✕</button>
+    </div>
+    <div class="mb">
+      <p class="m-note">Collez le rapport d'espionnage au format JSON. Les vaisseaux, défenses et ressources seront importés automatiquement dans la Flotte de Défense.</p>
+      <span class="m-label">Contenu du rapport (JSON)</span>
+      <textarea class="m-ta" id="spy-ta" placeholder='Collez votre rapport JSON ici…&#10;&#10;{ "game": "Solaris", "type": "espionage_report", ... }'></textarea>
+      <div id="spy-st" class="m-status"></div>
+      <div class="mf">
+        <button class="btn-cancel" onclick="closeSpy()">Annuler</button>
+        <button class="btn-val" onclick="parseSpy()">Valider l'import</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="share-modal-back" id="share-back" onclick="closeShare(event)">
+  <div class="share-modal" onclick="event.stopPropagation()">
+    <div class="share-banner">
+      <div class="share-banner-icon">🔗</div>
+      <div>
+        <div class="share-banner-title">Partager le Rapport de Combat</div>
+        <div class="share-banner-sub">Config + résultats encodés dans le lien — aucune base de données</div>
+      </div>
+      <button class="share-close" onclick="closeShare()">✕</button>
+    </div>
+    <div class="share-body">
+      <div class="share-url-wrap">
+        <input class="share-url" id="share-url" readonly onclick="this.select()">
+        <button class="btn-copy" id="btn-copy" onclick="copyShareUrl()">Copier</button>
+      </div>
+      <p class="share-note">Quiconque ouvre ce lien verra la configuration exacte et les résultats de cette simulation. Le lien fonctionne sans compte.</p>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="loading-title">Simulation en cours</div>
+  <div class="progress-wrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-fill"></div></div>
+    <div class="progress-counts">
+      <span id="prog-done">0 / 0</span>
+      <span id="prog-pct">0%</span>
+    </div>
+  </div>
+  <div class="loading-sub" id="prog-live">Initialisation…</div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <img class="logo-img" src="logo.png" alt="Solaris">
+  <div>
+    <div class="logo-text">SOLARIS</div>
+    <div class="logo-sub">Simulateur de Combat</div>
+  </div>
+  <div class="hdr-badge">v2.1</div>
+</header>
+
+<div class="main">
+
+  <!-- FLOTTE D'ATTAQUE -->
+  <div class="card c-atk">
+    <div class="ch">
+      <div class="ch-icon">⚔️</div>
+      <span class="ch-title">Flotte d'Attaque</span>
+      <span class="ch-pill">ATK</span>
+    </div>
+    <div class="cb">
+      <div class="tech-section">
+        <div class="tech-section-lbl">Technologies</div>
+        <div class="tgrid">
+          <div class="tf"><label class="tl">Sys. Balistiques</label><input type="number" class="ti" id="atk-weapons" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Champs Défl.</label><input type="number" class="ti" id="atk-shield" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Alliages Nano</label><input type="number" class="ti" id="atk-armor" value="0" min="0" max="25"></div>
+        </div>
+      </div>
+      <div id="atk-units"></div>
+    </div>
+  </div>
+
+  <!-- FLOTTE DE DÉFENSE -->
+  <div class="card c-def">
+    <div class="ch">
+      <div class="ch-icon">🛡️</div>
+      <span class="ch-title">Flotte de Défense</span>
+      <span class="ch-pill">DEF</span>
+      <button class="btn-spy" onclick="openSpy()">🔭 Rapport d'Espionnage</button>
+    </div>
+    <div class="cb">
+      <div class="tech-section">
+        <div class="tech-section-lbl">Technologies</div>
+        <div class="tgrid">
+          <div class="tf"><label class="tl">Sys. Balistiques</label><input type="number" class="ti" id="def-weapons" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Champs Défl.</label><input type="number" class="ti" id="def-shield" value="0" min="0" max="25"></div>
+          <div class="tf"><label class="tl">Alliages Nano</label><input type="number" class="ti" id="def-armor" value="0" min="0" max="25"></div>
+        </div>
+      </div>
+      <div id="def-units"></div>
+      <div class="tech-section" style="margin-top:12px;margin-bottom:0">
+        <div class="tech-section-lbl" style="color:var(--yellow);opacity:.8">Ressources sur la Planète</div>
+        <div class="tgrid">
+          <div class="tf">
+            <label class="tl" style="color:var(--c-fer)">Fer</label>
+            <input type="number" class="ti" id="planet-fer" value="0" min="0" placeholder="0" style="border-color:rgba(192,112,48,.3)">
+          </div>
+          <div class="tf">
+            <label class="tl" style="color:var(--c-sil)">Silice</label>
+            <input type="number" class="ti" id="planet-sil" value="0" min="0" placeholder="0" style="border-color:rgba(56,112,192,.3)">
+          </div>
+          <div class="tf">
+            <label class="tl" style="color:var(--c-xen)">Xenogas</label>
+            <input type="number" class="ti" id="planet-xen" value="0" min="0" placeholder="0" style="border-color:rgba(48,160,112,.3)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIM ROW -->
+  <div class="sim-row">
+    <div class="ss">
+      <span class="ss-lbl" style="color:var(--text3)">Nombre de simulations</span>
+      <div class="sim-opts" id="sim-count-opts">
+        <button type="button" class="sim-opt" data-n="10" onclick="setSimCount(10)">10</button>
+        <button type="button" class="sim-opt" data-n="100" onclick="setSimCount(100)">100</button>
+        <button type="button" class="sim-opt on" data-n="1000" onclick="setSimCount(1000)">1 000</button>
+      </div>
+      <span id="sim-count-hint" style="font-size:10px;color:var(--text3)">statistiquement stable</span>
+    </div>
+    <button class="btn-sim" onclick="runSim()">Lancer la Bataille</button>
+  </div>
+
+  <!-- RÉSULTATS -->
+  <div class="card c-res" id="res-panel">
+    <div class="ch">
+      <div class="ch-icon" style="background:var(--purple-bg)">📊</div>
+      <span class="ch-title" style="color:#b0a0f8">Résultats</span>
+      <button class="btn-spy" id="btn-share" onclick="openShare()" style="margin-left:auto">🔗 Partager</button>
+    </div>
+    <div class="cb">
+      <div class="res-inner">
+        <div class="rc">
+          <div class="rct">Issue du Combat</div>
+          <div id="res-outcome" class="outcome">—</div>
+          <div class="wr"><span class="wl" style="color:var(--orange)">Attaque gagne</span><span id="res-atk-pct" class="wp" style="color:var(--orange)">0%</span></div>
+          <div class="wr"><span class="wl" style="color:var(--green)">Défense gagne</span><span id="res-def-pct" class="wp" style="color:var(--green)">0%</span></div>
+          <div class="wr"><span class="wl" style="color:var(--text2)">Égalité</span><span id="res-draw-pct" class="wp" style="color:var(--text2)">0%</span></div>
+          <div style="margin-top:12px"><div class="rct">Rounds Moyens</div>
+          <div id="res-rounds" style="font-size:22px;font-weight:700;color:var(--text)">—</div></div>
+        </div>
+        <div class="rc">
+          <div class="rct">Survivants Moyens</div>
+          <div class="sv-sec">
+            <div class="sv-row"><span class="sv-lbl">ATK</span><div class="sv-tr"><div class="sv-fill fa" id="bar-atk" style="width:0%"></div></div><span class="sv-pct" id="pct-atk" style="color:var(--orange)">0%</span></div>
+            <div class="sv-row"><span class="sv-lbl">DEF</span><div class="sv-tr"><div class="sv-fill fd" id="bar-def" style="width:0%"></div></div><span class="sv-pct" id="pct-def" style="color:var(--green)">0%</span></div>
+          </div>
+          <div id="tbl-atk" style="margin-top:12px"></div>
+          <div id="tbl-def" style="margin-top:8px"></div>
+        </div>
+        <div class="rc">
+          <div class="rct">Économie de Combat</div>
+          <div class="rt">Pertes — Attaque</div>
+          <div class="rg">
+            <div class="rb"><div class="ri" style="color:var(--c-fer)">Fe</div><div class="rv2" id="atk-fer">0</div><div class="rk">Fer</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-sil)">Si</div><div class="rv2" id="atk-sil">0</div><div class="rk">Silice</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-xen)">Xg</div><div class="rv2" id="atk-xen">0</div><div class="rk">Xenogas</div></div>
+          </div>
+          <div class="rt" style="margin-top:8px">Pertes — Défense <span style="font-weight:400;opacity:.6">(30% perm. après reconstruction)</span></div>
+          <div class="rg">
+            <div class="rb"><div class="ri" style="color:var(--c-fer)">Fe</div><div class="rv2" id="def-fer">0</div><div class="rk">Fer</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-sil)">Si</div><div class="rv2" id="def-sil">0</div><div class="rk">Silice</div></div>
+            <div class="rb"><div class="ri" style="color:var(--c-xen)">Xg</div><div class="rv2" id="def-xen">0</div><div class="rk">Xenogas</div></div>
+          </div>
+          <div class="rt" style="margin-top:8px">CDR — Champ de Débris <span style="font-weight:400;opacity:.6">(30% fer+sil)</span></div>
+          <div class="rg">
+            <div class="rb" style="border-color:rgba(240,184,64,.25)"><div class="ri" style="color:var(--yellow)">Fe</div><div class="rv2" id="deb-fer" style="color:var(--yellow)">0</div><div class="rk">Fer</div></div>
+            <div class="rb" style="border-color:rgba(240,184,64,.25)"><div class="ri" style="color:var(--yellow)">Si</div><div class="rv2" id="deb-sil" style="color:var(--yellow)">0</div><div class="rk">Silice</div></div>
+            <div class="rb" style="border-color:rgba(240,184,64,.25);opacity:.35"><div class="ri" style="color:var(--yellow)">Xg</div><div class="rv2" style="color:var(--text3)">—</div><div class="rk">Exclus</div></div>
+          </div>
+          <div class="rt" style="margin-top:8px;color:var(--blue)">Pillage <span style="font-weight:400;opacity:.6">(50% planète, limité cargo)</span></div>
+          <div class="rg">
+            <div class="rb" style="border-color:rgba(74,158,255,.2)"><div class="ri" style="color:var(--blue)">Fe</div><div class="rv2" id="loot-fer" style="color:var(--blue)">0</div><div class="rk">Fer</div></div>
+            <div class="rb" style="border-color:rgba(74,158,255,.2)"><div class="ri" style="color:var(--blue)">Si</div><div class="rv2" id="loot-sil" style="color:var(--blue)">0</div><div class="rk">Silice</div></div>
+            <div class="rb" style="border-color:rgba(74,158,255,.2)"><div class="ri" style="color:var(--blue)">Xg</div><div class="rv2" id="loot-xen" style="color:var(--blue)">0</div><div class="rk">Xenogas</div></div>
+          </div>
+          <div id="loot-cargo-note" style="font-size:10px;color:var(--text3);margin-top:6px;display:none">⚠ Cargo insuffisant — pillage limité</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card c-log" id="log-panel">
+    <div class="ch">
+      <div class="ch-icon">📜</div>
+      <span class="ch-title" style="color:var(--blue)">Journal — Dernière Simulation</span>
+      <button class="btn-spy" id="btn-export" onclick="exportReport()" style="margin-left:auto">📋 Copier le rapport</button>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </div>
+
+  <!-- DISTRIBUTION -->
+  <div class="card c-log" id="dist-panel" style="display:none">
+    <div class="ch">
+      <div class="ch-icon" style="background:var(--blue-bg)">📈</div>
+      <span class="ch-title" style="color:var(--blue)" id="dist-title">Distribution</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:8px">min · P10 · médiane · P90 · max</span>
+    </div>
+    <div class="cb" id="dist-body" style="display:flex;flex-direction:column;gap:14px"></div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   SOLARIS COMBAT SIMULATOR — JS UNIQUE ET PROPRE
+   Architecture :
+   • DONNÉES & UI : thread principal
+   • MOTEUR DE COMBAT : 100% dans le Web Worker (WORKER_SRC)
+   • Pas de duplication de code moteur
+═══════════════════════════════════════════════════════════ */
+
+/* ─── DONNÉES VAISSEAUX & DÉFENSES ─── */
+const SHIPS = [
+  {id:'nova_scout',     name:'Chasseur Nova',        fer:3000,   sil:1000,   xen:0,       atk:50,     bou:10,    cqu:400,    cargo:50     },
+  {id:'fer_de_lance',   name:'Fer de Lance',       fer:6000,   sil:4000,   xen:0,       atk:150,    bou:25,    cqu:1000,   cargo:100    },
+  {id:'cyclone',        name:'Cyclone',            fer:20000,  sil:7000,   xen:2000,    atk:400,    bou:50,    cqu:2700,   cargo:800    },
+  {id:'bastion',        name:'Bastion',            fer:45000,  sil:15000,  xen:0,       atk:1000,   bou:200,   cqu:6000,   cargo:1500   },
+  {id:'pyro',           name:'Pyro',               fer:50000,  sil:25000,  xen:15000,   atk:1000,   bou:500,   cqu:7500,   cargo:500    },
+  {id:'nemesis',        name:'Nemesis',            fer:30000,  sil:40000,  xen:15000,   atk:700,    bou:400,   cqu:7000,   cargo:750    },
+  {id:'fulgurant',      name:'Fulgurant',          fer:60000,  sil:50000,  xen:15000,   atk:2000,   bou:500,   cqu:11000,  cargo:2000   },
+  {id:'titan_astral',   name:'Titan Astral',       fer:5000000,sil:4000000,xen:1000000, atk:200000, bou:50000, cqu:900000, cargo:1000000},
+  {id:'atlas_cargo',    name:'Cargo d\'Atlas',        fer:2000,   sil:2000,   xen:0,       atk:5,      bou:10,    cqu:400,    cargo:5000   },
+  {id:'atlas_cargo_xl', name:'Cargo Géant',     fer:6000,   sil:6000,   xen:0,       atk:5,      bou:25,    cqu:1200,   cargo:25000  },
+  {id:'barge_col',      name:'Vaisseau Genesis',    fer:10000,  sil:20000,  xen:10000,   atk:50,     bou:100,   cqu:3000,   cargo:7500   },
+  {id:'manta_recup',    name:'Moissonneur',        fer:10000,  sil:6000,   xen:2000,    atk:1,      bou:10,    cqu:1600,   cargo:20000  },
+  {id:'spectre_s',      name:'Spectre',      fer:0,      sil:1000,   xen:0,       atk:0,      bou:0,     cqu:100,    cargo:0      },
+  {id:'helios_r',       name:'Collecteur Solaris',  fer:0,      sil:2000,   xen:500,     atk:1,      bou:1,     cqu:200,    cargo:0      },
+];
+const DEFS = [
+  {id:'tourelle_c',  name:'Tourelle Cinétique',  fer:2000,  sil:0,    xen:0,    atk:80,   bou:20,   cqu:200   },
+  {id:'canon_imp',   name:'Canon à Impulsion',   fer:1500,  sil:500,  xen:0,    atk:100,  bou:25,   cqu:250   },
+  {id:'canon_fais',  name:'Canon de Faisceau',   fer:6000,  sil:2000, xen:0,    atk:250,  bou:100,  cqu:800   },
+  {id:'canon_m',     name:'Canon de Masse',      fer:20000, sil:15000,xen:2000, atk:1100, bou:200,  cqu:3500  },
+  {id:'proj_ion',    name:'Projecteur Ionique',  fer:5000,  sil:3000, xen:0,    atk:150,  bou:500,  cqu:800   },
+  {id:'canon_sol',   name:'Canon Solaire',       fer:50000, sil:50000,xen:30000,atk:3000, bou:300,  cqu:10000 },
+  {id:'bouclier_p',  name:'Petit Bouclier Plan.',fer:10000, sil:10000,xen:0,    atk:1,    bou:2000, cqu:2000  },
+  {id:'bouclier_g',  name:'Grand Bouclier Plan.',fer:50000, sil:50000,xen:0,    atk:1,    bou:10000,cqu:10000 },
+];
+const DEF_IDS = new Set(DEFS.map(d=>d.id));
+
+/* ─── RAPIDFIRE ─── */
+const RF = {
+  'nova_scout':    {'spectre_s':5,'helios_r':5},
+  'fer_de_lance':  {'atlas_cargo':3,'spectre_s':5,'helios_r':5},
+  'cyclone':       {'nova_scout':6,'spectre_s':5,'helios_r':5,'tourelle_c':10},
+  'bastion':       {'spectre_s':5,'helios_r':5},
+  'pyro':          {'spectre_s':5,'helios_r':5,'tourelle_c':20,'canon_imp':20,'canon_fais':10,'proj_ion':10,'canon_m':5,'canon_sol':5},
+  'nemesis':       {'atlas_cargo':3,'atlas_cargo_xl':3,'nova_scout':4,'fer_de_lance':4,'cyclone':4,'bastion':7,'spectre_s':5,'helios_r':5},
+  'fulgurant':     {'spectre_s':5,'helios_r':5,'nemesis':2,'canon_imp':10},
+  'titan_astral':  {
+    'atlas_cargo':250,'atlas_cargo_xl':250,'nova_scout':200,'fer_de_lance':100,
+    'cyclone':33,'bastion':30,'pyro':25,'fulgurant':5,
+    'spectre_s':1250,'helios_r':1250,'barge_col':250,'manta_recup':250,
+    'nemesis':15,'tourelle_c':200,'canon_imp':200,'canon_fais':100,
+    'proj_ion':100,'canon_m':50,
+  },
+};
+
+/* ─── UTILS ─── */
+const sf = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n);
+const ff = n => Math.round(n).toLocaleString('fr-FR');
+const fk = n => n>=1000?(n/1000).toFixed(1)+'k':Math.round(n).toString();
+const gv = id => parseInt(document.getElementById(id).value)||0;
+
+/* ─── BUILD UI ─── */
+function buildPanel(cid, prefix, includeDefenses) {
+  const c = document.getElementById(cid);
+  let h = '<div class="ucat">Vaisseaux</div><div class="ugrid">';
+  SHIPS.forEach(u => h += urow(u, prefix));
+  h += '</div>';
+  if (includeDefenses) {
+    h += '<div class="ucat">Défenses</div><div class="ugrid">';
+    DEFS.forEach(u => h += urow(u, prefix));
+    h += '</div>';
+  }
+  c.innerHTML = h;
+}
+
+function urow(u, prefix) {
+  const tip = 'ATK: '+u.atk+'  BOU: '+u.bou+'  CQU: '+u.cqu+'\nFer: '+sf(u.fer)+'  Sil: '+sf(u.sil)+'  Xen: '+sf(u.xen||0);
+  return '<div class="urow" data-tip="'+tip+'"><span class="uname">'+u.name+'</span>'
+    +'<input type="number" class="uinput" id="'+prefix+'-'+u.id+'" value="0" min="0" oninput="mr(this)"></div>';
+}
+
+function mr(inp) { inp.closest('.urow').classList.toggle('on', parseInt(inp.value)>0); }
+
+buildPanel('atk-units', 'atk', false);
+buildPanel('def-units', 'def', true);
+
+/* ─── MAPPING JSON → IDs simulateur ─── */
+/* Clés du rapport JSON (ships/buildings) → IDs internes du simulateur */
+const spyShipMap = {
+  'novaScout':       'nova_scout',
+  'ferDeLance':      'fer_de_lance',
+  'cyclone':         'cyclone',
+  'bastion':         'bastion',
+  'pyro':            'pyro',
+  'nemesis':         'nemesis',
+  'fulgurant':       'fulgurant',
+  'titanAstral':     'titan_astral',
+  'atlasCargo':      'atlas_cargo',
+  'atlasCargoXL':    'atlas_cargo_xl',
+  'atlasCargoXl':    'atlas_cargo_xl',
+  'colonyShip':      'barge_col',
+  'bargeCol':        'barge_col',
+  'bargeColoniale':  'barge_col',
+  'mantaRecup':      'manta_recup',
+  'spectreSonde':    'spectre_s',
+  'spectreS':        'spectre_s',
+  'heliosRemorqueur':'helios_r',
+  'heliosR':         'helios_r',
+};
+const spyDefMap = {
+  'kineticTurret':     'tourelle_c',
+  'tourelleCinetique': 'tourelle_c',
+  'tourelleC':         'tourelle_c',
+  'pulseCannon':       'canon_imp',
+  'canonImpulsion':    'canon_imp',
+  'canonImp':          'canon_imp',
+  'beamCannon':        'canon_fais',
+  'canonFaisceau':     'canon_fais',
+  'canonFais':         'canon_fais',
+  'ionProjector':      'proj_ion',
+  'projIon':           'proj_ion',
+  'massDriver':        'canon_m',
+  'canonMasse':        'canon_m',
+  'canonM':            'canon_m',
+  'solarCannon':       'canon_sol',
+  'canonSolaire':      'canon_sol',
+  'canonSol':          'canon_sol',
+  'petitBouclierPlan': 'bouclier_p',
+  'bouclierP':         'bouclier_p',
+  'smallShield':       'bouclier_p',
+  'grandBouclierPlan': 'bouclier_g',
+  'bouclierG':         'bouclier_g',
+  'largeShield':       'bouclier_g',
+};
+
+/* Fallback : nameMap textuel pour compatibilité */
+const nameMap = {};
+[...SHIPS, ...DEFS].forEach(u => {
+  nameMap[u.name.toLowerCase()] = u.id;
+  u.name.split(' ').forEach(w => { const k=w.toLowerCase(); if(k.length>3&&!nameMap[k]) nameMap[k]=u.id; });
+});
+
+/* ─── MODAL ESPIONNAGE ─── */
+function openSpy()  { document.getElementById('spy-back').classList.add('open'); document.getElementById('spy-ta').value=''; document.getElementById('spy-st').className='m-status'; }
+function closeSpy(e){ if(e&&e.target!==document.getElementById('spy-back')) return; document.getElementById('spy-back').classList.remove('open'); }
+
+function parseSpy() {
+  const raw = document.getElementById('spy-ta').value.trim();
+  const st  = document.getElementById('spy-st');
+  if(!raw){ st.textContent='Aucun contenu.'; st.className='m-status err'; return; }
+
+  /* Reset tous les champs défense */
+  [...SHIPS,...DEFS].forEach(u=>{ const el=document.getElementById('def-'+u.id); if(el){el.value=0;el.closest('.urow').classList.remove('on');} });
+
+  let report;
+  try { report = JSON.parse(raw); }
+  catch(e){ st.textContent='JSON invalide : '+e.message; st.className='m-status err'; return; }
+
+  if(!report || typeof report !== 'object'){
+    st.textContent='Format non reconnu (objet attendu).'; st.className='m-status err'; return;
+  }
+
+  let found = 0;
+  const details = [];
+
+  /* ── Import des vaisseaux (ships) ── */
+  if(report.ships && typeof report.ships === 'object'){
+    for(const [key, qty] of Object.entries(report.ships)){
+      if(!qty || qty <= 0) continue;
+      const id = spyShipMap[key] || spyDefMap[key];
+      if(id){
+        const el = document.getElementById('def-'+id);
+        if(el){ el.value = qty; el.closest('.urow').classList.add('on'); found++; details.push(qty+'x '+id); }
+      }
+    }
+  }
+
+  /* ── Import des défenses (defenses) ── */
+  if(report.defenses && typeof report.defenses === 'object'){
+    for(const [key, qty] of Object.entries(report.defenses)){
+      if(!qty || qty <= 0) continue;
+      const id = spyDefMap[key] || spyShipMap[key];
+      if(id){
+        const el = document.getElementById('def-'+id);
+        if(el){ el.value = qty; el.closest('.urow').classList.add('on'); found++; details.push(qty+'x '+id); }
+      }
+    }
+  }
+
+  /* ── Import des technologies de combat (défenseur) ── */
+  let techImported = false;
+  if(report.research && typeof report.research === 'object'){
+    const r = report.research;
+    if(r.weaponsTech != null) { document.getElementById('def-weapons').value = r.weaponsTech; techImported = true; }
+    if(r.shieldTech != null)  { document.getElementById('def-shield').value  = r.shieldTech;  techImported = true; }
+    if(r.armorTech != null)   { document.getElementById('def-armor').value   = r.armorTech;   techImported = true; }
+  }
+
+  /* ── Import des ressources ── */
+  let resImported = false;
+  if(report.resources && typeof report.resources === 'object'){
+    const r = report.resources;
+    if(r.fer != null)     { document.getElementById('planet-fer').value = Math.floor(r.fer);     resImported = true; }
+    if(r.silice != null)  { document.getElementById('planet-sil').value = Math.floor(r.silice);  resImported = true; }
+    if(r.novagas != null) { document.getElementById('planet-xen').value = Math.floor(r.novagas); resImported = true; }
+  }
+
+  /* ── Résumé ── */
+  const parts = [];
+  if(found > 0) parts.push(found+' type(s) d\'unités');
+  if(techImported) parts.push('techs');
+  if(resImported) parts.push('ressources');
+  if(report.target) parts.push('cible: '+report.target);
+  if(report.planet) parts.push('planète: '+report.planet);
+  if(report.coords) parts.push('['+report.coords.join(':')+']');
+
+  if(parts.length > 0){
+    st.textContent = '✓ Importé — '+parts.join(' · ');
+    st.className = 'm-status ok';
+    setTimeout(()=>document.getElementById('spy-back').classList.remove('open'), 1400);
+  } else {
+    st.textContent = 'Rapport reconnu mais aucune donnée exploitable (ships/defenses/resources vides).';
+    st.className = 'm-status err';
+  }
+}
+
+/* ─── MODAL PARTAGE ─── */
+let _lastShareState = null;
+function openShare()  { if(!_lastShareState) return; document.getElementById('share-url').value=location.href.split('#')[0]+'#'+encodeState(); document.getElementById('btn-copy').textContent='Copier'; document.getElementById('btn-copy').classList.remove('copied'); document.getElementById('share-back').classList.add('open'); }
+function closeShare(e){ if(e&&e.target!==document.getElementById('share-back')) return; document.getElementById('share-back').classList.remove('open'); }
+function copyShareUrl(){ const i=document.getElementById('share-url'); navigator.clipboard.writeText(i.value).then(()=>{ const b=document.getElementById('btn-copy'); b.textContent='✓ Copié !'; b.classList.add('copied'); setTimeout(()=>{b.textContent='Copier';b.classList.remove('copied');},2000); }).catch(()=>{i.select();document.execCommand('copy');}); }
+
+/* ─── BUILD FLEET DATA (sérialisable pour Worker) ─── */
+function buildFleetData(prefix, w, s, a) {
+  const all = prefix==='atk' ? [...SHIPS] : [...SHIPS,...DEFS];
+  return all.map(u => {
+    const cnt = gv(prefix+'-'+u.id);
+    if(!cnt) return null;
+    return { id:u.id, name:u.name, count:cnt, origCount:cnt,
+      atk: Math.round(u.atk*(1+w*.1)), bou: Math.round(u.bou*(1+s*.1)), cqu: Math.round(u.cqu*(1+a*.1)),
+      fer:u.fer, sil:u.sil, xen:u.xen||0, cargo:u.cargo||0 };
+  }).filter(Boolean);
+}
+
+/* ─── WEB WORKER (moteur de combat complet) ─── */
+const WORKER_SRC = `
+const RF={
+  'nova_scout':    {'spectre_s':5,'helios_r':5},
+  'fer_de_lance':  {'atlas_cargo':3,'spectre_s':5,'helios_r':5},
+  'cyclone':       {'nova_scout':6,'spectre_s':5,'helios_r':5,'tourelle_c':10},
+  'bastion':       {'spectre_s':5,'helios_r':5},
+  'pyro':          {'spectre_s':5,'helios_r':5,'tourelle_c':20,'canon_imp':20,'canon_fais':10,'proj_ion':10,'canon_m':5,'canon_sol':5},
+  'nemesis':       {'atlas_cargo':3,'atlas_cargo_xl':3,'nova_scout':4,'fer_de_lance':4,'cyclone':4,'bastion':7,'spectre_s':5,'helios_r':5},
+  'fulgurant':     {'spectre_s':5,'helios_r':5,'nemesis':2,'canon_imp':10},
+  'titan_astral':{
+    'atlas_cargo':250,'atlas_cargo_xl':250,'nova_scout':200,'fer_de_lance':100,
+    'cyclone':33,'bastion':30,'pyro':25,'fulgurant':5,
+    'spectre_s':1250,'helios_r':1250,'barge_col':250,'manta_recup':250,
+    'nemesis':15,'tourelle_c':200,'canon_imp':200,'canon_fais':100,
+    'proj_ion':100,'canon_m':50,
+  },
+};
+const DEF_IDS=new Set(['tourelle_c','canon_imp','canon_fais','canon_m','proj_ion','canon_sol','bouclier_p','bouclier_g']);
+
+function makeEntities(u){
+  const arr=[];
+  for(let i=0;i<u.count;i++) arr.push({id:u.id+'_'+i,typeId:u.id,name:u.name,atk:u.atk,bou:u.bou,hullMax:u.cqu,hull:u.cqu,sp:u.bou,dead:false,removed:false});
+  return arr;
+}
+
+function countAlive(fleet){ return fleet.filter(e=>!e.removed).length; }
+
+function countByType(fleet){
+  const m={};
+  fleet.filter(e=>!e.removed&&!e.dead&&e.hull>0).forEach(e=>{ m[e.typeId]=(m[e.typeId]||0)+1; });
+  return m;
+}
+
+function fireOneShot(unit, targets, pendingDamage){
+  const alive=targets.filter(t=>t.hull>0);
+  if(!alive.length) return null;
+  const target=alive[Math.floor(Math.random()*alive.length)];
+  if(unit.atk<=target.bou*0.01) return target.typeId; /* bounce */
+  const key=target.id;
+  const pending=pendingDamage.get(key)||{shield:0,hull:0};
+  const effShield=Math.max(0,target.sp-pending.shield);
+  if(effShield>0){
+    const abs=Math.min(effShield,unit.atk);
+    pending.shield+=abs;
+    const rem=unit.atk-abs;
+    if(rem>0) pending.hull+=rem;
+  } else { pending.hull+=unit.atk; }
+  pendingDamage.set(key,pending);
+  return target.typeId;
+}
+
+function fireOneUnit(unit, targets, pendingDamage){
+  const rfMap=RF[unit.typeId]||{};
+  let keep=true, shots=0;
+  while(keep){
+    shots++; if(shots>2000) break;
+    const hitId=fireOneShot(unit,targets,pendingDamage);
+    if(hitId===null) break;
+    const rf=rfMap[hitId]||0;
+    if(rf<=1){ keep=false; break; }
+    if(Math.random()>=(1-1/rf)) keep=false;
+  }
+}
+
+function fireRoundSimultaneous(atk, def){
+  /* Dégâts accumulés avant application — exactement comme Solaris */
+  const pendingOnDef=new Map(), pendingOnAtk=new Map();
+  atk.forEach(u=>{ if(u.hull>0) fireOneUnit(u,def,pendingOnDef); });
+  def.forEach(u=>{ if(u.hull>0) fireOneUnit(u,atk,pendingOnAtk); });
+
+  let sdDef=0,hdDef=0,sdAtk=0,hdAtk=0;
+
+  def.forEach(u=>{
+    const p=pendingOnDef.get(u.id); if(!p) return;
+    const sd=Math.min(u.sp,p.shield); u.sp-=sd; sdDef+=sd;
+    const hd=p.hull+(p.shield-sd); if(hd>0){ u.hull-=hd; hdDef+=hd; if(u.hull<0)u.hull=0; }
+  });
+  atk.forEach(u=>{
+    const p=pendingOnAtk.get(u.id); if(!p) return;
+    const sd=Math.min(u.sp,p.shield); u.sp-=sd; sdAtk+=sd;
+    const hd=p.hull+(p.shield-sd); if(hd>0){ u.hull-=hd; hdAtk+=hd; if(u.hull<0)u.hull=0; }
+  });
+
+  /* Explosions + reset bouclier par unité (Solaris exact) */
+  let explosions=0, checks=0;
+  [...atk,...def].forEach(u=>{
+    if(u.hull>0 && u.hull<u.hullMax*0.7){
+      checks++;
+      if(Math.random()<1-(u.hull/u.hullMax)){ u.hull=0; explosions++; return; }
+    }
+    if(u.hull>0) u.sp=u.bou;
+  });
+
+  return{sdDef:Math.round(sdDef),hdDef:Math.round(hdDef),
+    sdAtk:Math.round(sdAtk),hdAtk:Math.round(hdAtk),explosions,checks};
+}
+
+function lostStr(before,after){
+  const out=[];
+  for(const[id,n] of Object.entries(before)){ const l=n-(after[id]||0); if(l>0) out.push(l+'x '+id.replace(/_/g,' ')); }
+  return out.length?out.join(', '):'Aucune perte';
+}
+
+function lostCount(before,after){
+  return Object.entries(before).reduce((s,[id,n])=>s+(n-(after[id]||0)),0);
+}
+
+function simulate(ab,db){
+  const atkTotal=ab.reduce((s,u)=>s+u.origCount,0);
+  const defTotal=db.reduce((s,u)=>s+u.origCount,0);
+  let atk=[]; ab.forEach(u=>atk=atk.concat(makeEntities(u)));
+  let def=[]; db.forEach(u=>def=def.concat(makeEntities(u)));
+  const log=[];
+
+  for(let r=0;r<6;r++){
+    /* Vivants = hull > 0 (pas de flag dead/removed, comme Solaris) */
+    const atkAliveStart=atk.filter(e=>e.hull>0).length;
+    const defAliveStart=def.filter(e=>e.hull>0).length;
+    if(!atkAliveStart||!defAliveStart) break;
+
+    const atkBefore=countByType(atk.filter(e=>e.hull>0));
+    const defBefore=countByType(def.filter(e=>e.hull>0));
+
+    const res=fireRoundSimultaneous(atk,def);
+
+    /* Compter après application */
+    const atkAfterArr=atk.filter(e=>e.hull>0);
+    const defAfterArr=def.filter(e=>e.hull>0);
+    const atkAfter=countByType(atkAfterArr);
+    const defAfter=countByType(defAfterArr);
+    const ra=atkAfterArr.length, rd=defAfterArr.length;
+
+    log.push({round:r+1,atkAlive:ra,defAlive:rd,atkTotal,defTotal,
+      dmgShieldOnDef:res.sdDef,dmgHullOnDef:res.hdDef,
+      defLostStr:lostStr(defBefore,defAfter),defLostCount:lostCount(defBefore,defAfter),
+      dmgShieldOnAtk:res.sdAtk,dmgHullOnAtk:res.hdAtk,
+      atkLostStr:lostStr(atkBefore,atkAfter),atkLostCount:lostCount(atkBefore,atkAfter),
+      explTotal:res.explosions,checksTotal:res.checks,
+    });
+    if(!ra||!rd) break;
+  }
+
+  const al=atk.filter(e=>e.hull>0).length;
+  const dl=def.filter(e=>e.hull>0).length;
+  const winner=al>0&&dl===0?'atk':dl>0&&al===0?'def':'draw';
+
+  /* Survivants par typeId */
+  const atkSurv={}, defSurv={};
+  atk.filter(e=>e.hull>0).forEach(e=>{ atkSurv[e.typeId]=(atkSurv[e.typeId]||0)+1; });
+  def.filter(e=>e.hull>0).forEach(e=>{ defSurv[e.typeId]=(defSurv[e.typeId]||0)+1; });
+
+  /* Reconstruction défenses 70% avec roll individuel */
+  const defLossDetail={};
+  db.forEach(u=>{
+    const surv=defSurv[u.id]||0;
+    const destroyed=u.origCount-surv;
+    let rebuilt=0;
+    if(DEF_IDS.has(u.id)) for(let k=0;k<destroyed;k++) if(Math.random()<0.70) rebuilt++;
+    defLossDetail[u.id]={destroyed,rebuilt,permLost:destroyed-rebuilt,remaining:surv+rebuilt};
+  });
+
+  return{winner,log,atkSurv,defSurv,defLossDetail};
+}
+
+/* ─── Boucle principale du Worker ─── */
+self.onmessage=function(e){
+  const{ab,db,n}=e.data;
+  let aw=0,dw=0,dr=0,totRounds=0;
+
+  /* Accumulateurs survivants */
+  const atkSurvAcc={}, defSurvAcc={};
+  ab.forEach(u=>atkSurvAcc[u.id]=0);
+  db.forEach(u=>defSurvAcc[u.id]=0);
+
+  /* Distributions par unité */
+  const atkLossDist={}, defLossDist={};
+  ab.forEach(u=>atkLossDist[u.id]=[]);
+  db.forEach(u=>defLossDist[u.id]=[]);
+
+  const roundsDist=[];
+  let lastLog=[];
+
+  for(let i=0;i<n;i++){
+    const res=simulate(ab.map(u=>({...u})),db.map(u=>({...u})));
+    if(res.winner==='atk')aw++;
+    else if(res.winner==='def')dw++;
+    else dr++;
+    totRounds+=res.log.length;
+
+    ab.forEach(u=>{ const s=res.atkSurv[u.id]||0; atkSurvAcc[u.id]+=s; atkLossDist[u.id].push(u.origCount-s); });
+    db.forEach(u=>{
+      const d=res.defLossDetail[u.id]||{destroyed:0,rebuilt:0,permLost:0,remaining:u.origCount};
+      defSurvAcc[u.id]+=(res.defSurv[u.id]||0);
+      defLossDist[u.id].push(d);
+    });
+    roundsDist.push(res.log.length);
+    if(i===n-1) lastLog=res.log;
+
+    const progStep=Math.max(1,Math.floor(n/40));
+    if((i+1)%progStep===0||(i+1)===n) self.postMessage({type:'progress',done:i+1,total:n,aw,dw,dr});
+  }
+
+  self.postMessage({type:'done',aw,dw,dr,n,totRounds,
+    atkSurvAcc,defSurvAcc,lastLog,
+    atkLossDist,defLossDist,roundsDist,
+    ab,db
+  });
+};
+`;
+
+/* ─── LANCER LA SIMULATION ─── */
+let activeWorker = null;
+let simCount = 1000;
+
+const SIM_COUNT_HINTS = {10:'rapide — aperçu', 100:'équilibré', 1000:'statistiquement stable'};
+function fmtSimCount(n){ return n.toLocaleString('fr-FR'); }
+
+function setSimCount(n){
+  simCount=n;
+  document.querySelectorAll('.sim-opt').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.n,10)===n));
+  const hint=document.getElementById('sim-count-hint');
+  if(hint) hint.textContent=SIM_COUNT_HINTS[n]||'';
+}
+
+function runSim() {
+  const aw=gv('atk-weapons'), as_=gv('atk-shield'), aa=gv('atk-armor');
+  const dw=gv('def-weapons'), ds=gv('def-shield'),  da=gv('def-armor');
+  const ab=buildFleetData('atk',aw,as_,aa);
+  const db=buildFleetData('def',dw,ds,da);
+  const totAtk=ab.reduce((s,u)=>s+u.origCount,0);
+  const totDef=db.reduce((s,u)=>s+u.origCount,0);
+  if(!totAtk&&!totDef){ alert('Ajoutez des unités des deux côtés !'); return; }
+
+  if(activeWorker){ activeWorker.terminate(); activeWorker=null; }
+
+  const el=id=>document.getElementById(id);
+  el('loading').classList.add('on');
+  el('prog-fill').style.width='0%';
+  el('prog-done').textContent='0 / '+fmtSimCount(simCount);
+  el('prog-pct').textContent='0%';
+  el('prog-live').textContent='Initialisation…';
+
+  const blob=new Blob([WORKER_SRC],{type:'application/javascript'});
+  const url=URL.createObjectURL(blob);
+  activeWorker=new Worker(url);
+  URL.revokeObjectURL(url);
+
+  activeWorker.onmessage=function(e){
+    const d=e.data;
+    if(d.type==='progress'){
+      const pct=Math.round(d.done/d.total*100);
+      el('prog-fill').style.width=pct+'%';
+      el('prog-done').textContent=d.done+' / '+d.total;
+      el('prog-pct').textContent=pct+'%';
+      el('prog-live').textContent='ATK '+Math.round(d.aw/d.done*100)+'%  |  DEF '+Math.round(d.dw/d.done*100)+'%  |  Ég. '+Math.round(d.dr/d.done*100)+'%';
+      return;
+    }
+    if(d.type==='done'){
+      el('loading').classList.remove('on');
+      activeWorker=null;
+      renderResults(d, ab, db, totAtk, totDef);
+    }
+  };
+  activeWorker.onerror=function(err){ console.error(err); el('loading').classList.remove('on'); };
+  activeWorker.postMessage({ab,db,n:simCount});
+}
+
+/* ─── RENDU RÉSULTATS ─── */
+function renderResults(d, ab, db, totAtk, totDef) {
+  const {aw,dw,dr,n,totRounds,atkSurvAcc,defSurvAcc,lastLog,atkLossDist,defLossDist,roundsDist} = d;
+  const el=id=>document.getElementById(id);
+
+  /* ── Outcome ── */
+  const ap=(aw/n*100).toFixed(1), dp=(dw/n*100).toFixed(1), rp=(dr/n*100).toFixed(1);
+  const ar=(totRounds/n).toFixed(2);
+  const out=el('res-outcome');
+  if(aw>=dw&&aw>=dr){ out.textContent='⚔ Victoire — Attaque';  out.className='outcome o-atk'; }
+  else if(dw>=aw&&dw>=dr){ out.textContent='🛡 Victoire — Défense'; out.className='outcome o-def'; }
+  else { out.textContent='⚖ Égalité'; out.className='outcome o-draw'; }
+  el('res-atk-pct').textContent=ap+'%';
+  el('res-def-pct').textContent=dp+'%';
+  el('res-draw-pct').textContent=rp+'%';
+  el('res-rounds').textContent=ar;
+
+  /* ── Barres survivants ── */
+  const atkAvg=Object.values(atkSurvAcc).reduce((s,v)=>s+v,0)/n;
+  const defAvg=Object.values(defSurvAcc).reduce((s,v)=>s+v,0)/n;
+  const ap2=totAtk?Math.round(atkAvg/totAtk*100):0;
+  const dp2=totDef?Math.round(defAvg/totDef*100):0;
+  el('bar-atk').style.width=ap2+'%'; el('pct-atk').textContent=ap2+'%';
+  el('bar-def').style.width=dp2+'%'; el('pct-def').textContent=dp2+'%';
+
+  /* ── Tables survivants ── */
+  el('tbl-atk').innerHTML=survTableHTML(ab, atkSurvAcc, n, 'atk');
+  el('tbl-def').innerHTML=survTableDEF(db, defSurvAcc, defLossDist, n);
+
+  /* ── Pertes ressources ── */
+  let af=0,asil=0,ax=0,df=0,dsil=0,dx=0;
+  /* CDR séparé — seulement les vaisseaux des deux côtés, pas les défenses, pas xenogas */
+  let cdrFer=0, cdrSil=0;
+
+  ab.forEach(u=>{
+    const l=u.origCount-(atkSurvAcc[u.id]||0)/n;
+    af+=l*u.fer; asil+=l*u.sil; ax+=l*(u.xen||0);
+    /* ATK ships → CDR */
+    cdrFer+=l*u.fer*0.30; cdrSil+=l*u.sil*0.30;
+  });
+  db.forEach(u=>{
+    const raw=defLossDist[u.id]||[];
+    const isDefense=DEF_IDS.has(u.id);
+    const permAvg=isDefense
+      ? raw.reduce((s,d2)=>s+(d2.permLost||0),0)/Math.max(1,raw.length)
+      : u.origCount-(defSurvAcc[u.id]||0)/n;
+    df+=permAvg*u.fer; dsil+=permAvg*u.sil; dx+=permAvg*(u.xen||0);
+    /* DEF ships seulement → CDR (pas les défenses) */
+    if(!isDefense){
+      const lostAvg=u.origCount-(defSurvAcc[u.id]||0)/n;
+      cdrFer+=lostAvg*u.fer*0.30; cdrSil+=lostAvg*u.sil*0.30;
+    }
+  });
+
+  el('atk-fer').textContent=ff(af); el('atk-sil').textContent=ff(asil); el('atk-xen').textContent=ff(ax);
+  el('def-fer').textContent=ff(df); el('def-sil').textContent=ff(dsil); el('def-xen').textContent=ff(dx);
+  el('deb-fer').textContent=ff(cdrFer); el('deb-sil').textContent=ff(cdrSil);
+
+  /* ── Pillage ── */
+  const pFer=gv('planet-fer'), pSil=gv('planet-sil'), pXen=gv('planet-xen');
+  let cargoAvg=0;
+  ab.forEach(u=>{ const s=(atkSurvAcc[u.id]||0)/n; const cu=SHIPS.find(x=>x.id===u.id)?.cargo||0; cargoAvg+=s*cu; });
+  const maxLoot=pFer/2+pSil/2+pXen/2;
+  let lootFer=0,lootSil=0,lootXen=0;
+  if(maxLoot>0){
+    const avail=Math.min(cargoAvg,maxLoot);
+    lootFer=Math.min(pFer/2,avail*(pFer/2)/maxLoot);
+    lootSil=Math.min(pSil/2,avail*(pSil/2)/maxLoot);
+    lootXen=Math.min(pXen/2,avail*(pXen/2)/maxLoot);
+  }
+  el('loot-fer').textContent=ff(lootFer); el('loot-sil').textContent=ff(lootSil); el('loot-xen').textContent=ff(lootXen);
+  const note=el('loot-cargo-note');
+  if(maxLoot>0&&cargoAvg<maxLoot){ note.style.display='block'; note.textContent='⚠ Cargo moyen '+ff(cargoAvg)+' < pillage max '+ff(maxLoot); }
+  else note.style.display='none';
+
+  /* ── Journal ── */
+  renderLog(lastLog, ab, db);
+
+  /* ── Distribution ── */
+  const distTitle=document.getElementById('dist-title');
+  if(distTitle) distTitle.textContent='Distribution sur '+fmtSimCount(n)+' simulation'+(n>1?'s':'');
+  renderDistribution(atkLossDist, defLossDist, roundsDist, ab, db);
+
+  el('res-panel').classList.add('v');
+  el('log-panel').classList.add('v');
+
+  /* ── Sauvegarde partage ── */
+  _lastShareState={aw,dw,dr,ap,dp,rp,ar,ap2,dp2,
+    atk_fer:ff(af),atk_sil:ff(asil),atk_xen:ff(ax),
+    def_fer:ff(df),def_sil:ff(dsil),def_xen:ff(dx),
+    deb_fer:ff((af+df)*.30),deb_sil:ff((asil+dsil)*.30),
+    loot_fer:ff(lootFer),loot_sil:ff(lootSil),loot_xen:ff(lootXen),
+    tbl_atk:el('tbl-atk').innerHTML,tbl_def:el('tbl-def').innerHTML,
+    log:el('log-body').innerHTML};
+  _lastLog=lastLog; _lastWinner=aw>=dw&&aw>=dr?'atk':dw>=aw&&dw>=dr?'def':'draw';
+  _lastFleets={ab,db,n};
+}
+
+/* ─── TABLES SURVIVANTS ─── */
+function survTableHTML(fleet, survAcc, n, side) {
+  if(!fleet.length) return '';
+  const col=side==='atk'?'var(--orange)':'var(--green)';
+  let h='<div style="font-size:9px;color:'+col+';letter-spacing:2px;margin-bottom:4px;text-transform:uppercase">'+(side==='atk'?'Attaque':'Défense')+' — Unités</div>';
+  h+='<table class="stbl"><tr><th>Unité</th><th style="text-align:right">Init.</th><th style="text-align:right">Surv.</th><th style="text-align:right">Pertes</th></tr>';
+  fleet.forEach(u=>{
+    const avg=(survAcc[u.id]||0)/n;
+    h+='<tr><td>'+u.name+'</td><td class="rv">'+u.origCount+'</td><td class="rv sv">'+avg.toFixed(1)+'</td><td class="rv ls">'+(u.origCount-avg).toFixed(1)+'</td></tr>';
+  });
+  return h+'</table>';
+}
+
+function survTableDEF(fleet, survAcc, defLossDist, n) {
+  if(!fleet.length) return '';
+  let h='<div style="font-size:9px;color:var(--green);letter-spacing:2px;margin-bottom:4px;text-transform:uppercase">Défense — Unités</div>';
+  h+='<table class="stbl"><tr><th>Unité</th><th style="text-align:right">Init.</th><th style="text-align:right">Détruits</th><th style="text-align:right;color:var(--green)">Reconstruits</th><th style="text-align:right;color:var(--red)">Perdus déf.</th></tr>';
+  fleet.forEach(u=>{
+    const avgSurv=(survAcc[u.id]||0)/n;
+    const avgDest=u.origCount-avgSurv;
+    const isD=DEF_IDS.has(u.id);
+    const raw=defLossDist[u.id]||[];
+    const avgPerm=isD&&raw.length ? raw.reduce((s,d)=>s+(d.permLost||0),0)/raw.length : avgDest;
+    const avgReb=avgDest-avgPerm;
+    h+='<tr><td>'+u.name+'</td><td class="rv">'+u.origCount+'</td>'
+      +'<td class="rv ls">'+avgDest.toFixed(1)+'</td>'
+      +'<td class="rv sv">'+(isD?avgReb.toFixed(1):'—')+'</td>'
+      +'<td class="rv ls" style="color:var(--red)">'+avgPerm.toFixed(1)+'</td></tr>';
+  });
+  return h+'</table>';
+}
+
+/* ─── JOURNAL ─── */
+function renderLog(lastLog, ab, db) {
+  const el=id=>document.getElementById(id);
+  const fk=n=>n>=1000?(n/1000).toFixed(1)+'k':Math.round(n).toString();
+
+  const atkPow=ab.reduce((s,u)=>s+u.atk*u.origCount,0);
+  const defPow=db.reduce((s,u)=>s+u.atk*u.origCount,0);
+  const atkPV =ab.reduce((s,u)=>s+u.cqu*u.origCount,0);
+  const defPV =db.reduce((s,u)=>s+u.cqu*u.origCount,0);
+  const atkTot=ab.reduce((s,u)=>s+u.origCount,0);
+  const defTot=db.reduce((s,u)=>s+u.origCount,0);
+  const ratioAD=defPV>0?(atkPow/defPV).toFixed(2):'∞';
+  const ratioDA=atkPV>0?(defPow/atkPV).toFixed(2):'∞';
+
+  let html='<div style="background:var(--card3);border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Analyse des forces</div>'
+    +'<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;margin-bottom:6px">'
+    +'<div><div style="color:var(--text3);font-size:9px;margin-bottom:2px">Puissance ATK</div><div style="font-size:16px;font-weight:700;color:var(--orange)">'+fk(atkPow)+'</div></div>'
+    +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px">'
+    +'<div style="color:var(--text3);font-size:9px">vs PV DEF</div>'
+    +'<div style="background:rgba(255,255,255,.08);border-radius:6px;padding:2px 6px;font-size:10px;font-weight:700;color:var(--text);margin-top:2px">×'+ratioAD+'</div></div>'
+    +'<div style="text-align:right"><div style="color:var(--text3);font-size:9px;margin-bottom:2px">PV total DEF</div><div style="font-size:16px;font-weight:700;color:var(--green)">'+fk(defPV)+'</div></div>'
+    +'</div><div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;margin-bottom:10px">'
+    +'<div><div style="color:var(--text3);font-size:9px;margin-bottom:2px">Puissance DEF</div><div style="font-size:16px;font-weight:700;color:var(--green)">'+fk(defPow)+'</div></div>'
+    +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px">'
+    +'<div style="color:var(--text3);font-size:9px">vs PV ATK</div>'
+    +'<div style="background:rgba(255,255,255,.08);border-radius:6px;padding:2px 6px;font-size:10px;font-weight:700;color:var(--text);margin-top:2px">×'+ratioDA+'</div></div>'
+    +'<div style="text-align:right"><div style="color:var(--text3);font-size:9px;margin-bottom:2px">PV total ATK</div><div style="font-size:16px;font-weight:700;color:var(--orange)">'+fk(atkPV)+'</div></div>'
+    +'</div><div style="font-size:10px;color:var(--text3)">Unités : <span style="color:var(--orange);font-weight:600">'+atkTot+' ATK</span> vs <span style="color:var(--green);font-weight:600">'+defTot+' DEF</span></div>'
+    +'</div>';
+
+  lastLog.forEach(function(l){
+    if(!l||typeof l!=='object'||!l.round) return;
+    const exBadge=l.explTotal>0?'<span style="background:rgba(255,120,0,.2);color:var(--orange);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700">💥 '+l.explTotal+'</span>':'';
+    const chk=l.checksTotal>0?'<span style="font-size:10px;color:var(--text3)">Checks: '+l.checksTotal+'</span>':'';
+    html+='<div style="background:var(--card3);border-radius:10px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--border)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      +'<span style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:14px;color:var(--yellow)">Round '+l.round+'</span>'+exBadge+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+      +'<div style="background:rgba(224,120,64,.07);border-radius:8px;padding:10px 12px">'
+      +'<div style="font-size:9px;font-weight:700;color:var(--orange);letter-spacing:.5px;margin-bottom:6px">ATK → DEF</div>'
+      +'<div style="font-size:12px;color:var(--text2);margin-bottom:6px">🛡 <span style="color:var(--c-sil);font-weight:600">'+fk(l.dmgShieldOnDef)+'</span> &nbsp;❤️ <span style="color:var(--red);font-weight:600">'+fk(l.dmgHullOnDef)+'</span></div>'
+      +'<div style="font-size:12px;font-weight:700;color:'+(l.defLostCount>0?'var(--red)':'var(--text3)')+'">'+( l.defLostCount>0?'−'+l.defLostCount+' détruits':'Aucune perte')+'</div>'
+      +(l.defLostCount>0?'<div style="font-size:10px;color:var(--text3);margin-top:3px">'+l.defLostStr+'</div>':'')
+      +'</div>'
+      +'<div style="background:rgba(46,204,138,.07);border-radius:8px;padding:10px 12px">'
+      +'<div style="font-size:9px;font-weight:700;color:var(--green);letter-spacing:.5px;margin-bottom:6px">DEF → ATK</div>'
+      +'<div style="font-size:12px;color:var(--text2);margin-bottom:6px">🛡 <span style="color:var(--c-sil);font-weight:600">'+fk(l.dmgShieldOnAtk)+'</span> &nbsp;❤️ <span style="color:var(--red);font-weight:600">'+fk(l.dmgHullOnAtk)+'</span></div>'
+      +'<div style="font-size:12px;font-weight:700;color:'+(l.atkLostCount>0?'var(--red)':'var(--text3)')+'">'+( l.atkLostCount>0?'−'+l.atkLostCount+' détruits':'Aucune perte')+'</div>'
+      +(l.atkLostCount>0?'<div style="font-size:10px;color:var(--text3);margin-top:3px">'+l.atkLostStr+'</div>':'')
+      +'</div></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:12px;font-weight:600">ATK: <span style="color:var(--orange)">'+l.atkAlive+'/'+l.atkTotal+'</span> &nbsp;&nbsp; DEF: <span style="color:var(--green)">'+l.defAlive+'/'+l.defTotal+'</span></span>'
+      +chk+'</div></div>';
+  });
+
+  document.getElementById('log-body').innerHTML=html;
+}
+
+/* ─── DISTRIBUTION ─── */
+function pct(arr,p){ const s=[...arr].sort((a,b)=>a-b); return s[Math.max(0,Math.floor(s.length*p/100)-1)]||0; }
+function mean(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
+
+function sparkline(arr,color,total){
+  const mn=Math.min(...arr),mx=Math.max(...arr);
+  if(mx===0) return '<div style="width:100%;height:8px;background:var(--card3);border-radius:4px;opacity:.3"></div>';
+  const scale=v=>total>0?Math.round(v/total*100):Math.round(v/mx*100);
+  const p25=pct(arr,25),med=pct(arr,50),p75=pct(arr,75);
+  return '<div style="position:relative;width:100%;height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">'
+    +'<div style="position:absolute;left:'+scale(mn)+'%;width:'+Math.max(1,scale(mx)-scale(mn))+'%;height:100%;background:'+color+';opacity:.25;border-radius:4px"></div>'
+    +'<div style="position:absolute;left:'+scale(p25)+'%;width:'+Math.max(1,scale(p75)-scale(p25))+'%;height:100%;background:'+color+';opacity:.8;border-radius:2px"></div>'
+    +'<div style="position:absolute;left:'+scale(med)+'%;width:2px;height:100%;background:#fff;opacity:.9"></div>'
+    +'</div>';
+}
+
+function renderDistribution(atkLossDist, defLossDist, roundsDist, ab, db) {
+  const body=document.getElementById('dist-body');
+  const fk=n=>n>=1000?(n/1000).toFixed(1)+'k':Math.round(n).toString();
+
+  /* Rounds */
+  const mn=Math.min(...roundsDist),mx=Math.max(...roundsDist),med=pct(roundsDist,50),avg=mean(roundsDist);
+  let html='<div style="background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px">'
+    +'<div style="font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Rounds de combat</div>'
+    +'<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">'
+    +[['MIN',mn,'var(--red)'],['MÉD.',med,'var(--yellow)'],['MOY.',avg.toFixed(1),'var(--text2)'],['MAX',mx,'var(--green)']].map(([l,v,c])=>'<div style="text-align:center"><div style="font-size:9px;font-weight:600;color:'+c+';letter-spacing:.5px">'+l+'</div><div style="font-size:20px;font-weight:700;color:var(--text);line-height:1.2">'+v+'</div></div>').join('')
+    +'<div style="flex:1;min-width:100px">'+sparkline(roundsDist,'var(--yellow)',6)+'</div>'
+    +'</div></div>';
+
+  /* ATK */
+  const atkUnits=ab.filter(u=>u.origCount>0);
+  if(atkUnits.length){
+    html+='<div style="background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px">'
+      +'<div style="font-size:10px;font-weight:600;color:var(--orange);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">⚔ Pertes Attaque — par unité</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr style="border-bottom:1px solid var(--border)">'
+      +'<th style="text-align:left;padding:5px 7px;font-size:10px;font-weight:600;color:var(--text3)">Unité</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text3)">Qté</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--red)">MIN</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text3)">P25</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--yellow)">MÉD.</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text3)">P75</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--green)">MAX</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text2)">MOY.</th>'
+      +'<th style="padding:5px 7px;min-width:80px;font-size:10px;color:var(--text3)">Distrib.</th>'
+      +'</tr></thead><tbody>';
+    atkUnits.forEach(function(u,ri){
+      const arr=atkLossDist[u.id]||[];
+      if(!arr.length) return;
+      const bg=ri%2===0?'transparent':'rgba(255,255,255,.02)';
+      const mn2=Math.min(...arr),p25=pct(arr,25),med2=pct(arr,50),p75=pct(arr,75),mx2=Math.max(...arr),avg2=mean(arr);
+      html+='<tr style="background:'+bg+';border-bottom:1px solid rgba(255,255,255,.04)">'
+        +'<td style="padding:7px;color:var(--text);font-weight:500">'+u.name+'</td>'
+        +'<td style="padding:7px;text-align:center;color:var(--text3)">'+u.origCount+'</td>'
+        +'<td style="padding:7px;text-align:center;font-weight:700;color:'+(mn2>0?'var(--red)':'var(--green)')+'">'+mn2+'</td>'
+        +'<td style="padding:7px;text-align:center;color:var(--text2)">'+p25+'</td>'
+        +'<td style="padding:7px;text-align:center;font-weight:700;font-size:13px;color:var(--yellow)">'+med2+'</td>'
+        +'<td style="padding:7px;text-align:center;color:var(--text2)">'+p75+'</td>'
+        +'<td style="padding:7px;text-align:center;font-weight:700;color:'+(mx2>0?'var(--red)':'var(--green)')+'">'+mx2+'</td>'
+        +'<td style="padding:7px;text-align:center;color:var(--text2)">'+avg2.toFixed(1)+'</td>'
+        +'<td style="padding:7px 12px 7px 7px">'+sparkline(arr,'var(--orange)',u.origCount)+'</td>'
+        +'</tr>';
+    });
+    html+='</tbody></table></div></div>';
+  }
+
+  /* DEF */
+  const defUnits=db.filter(u=>u.origCount>0);
+  if(defUnits.length){
+    html+='<div style="background:var(--card2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px">'
+      +'<div style="font-size:10px;font-weight:600;color:var(--green);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">🛡 Pertes Défense — par unité</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr style="border-bottom:1px solid var(--border)">'
+      +'<th style="text-align:left;padding:5px 7px;font-size:10px;font-weight:600;color:var(--text3)">Unité</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text3)">Qté</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--red)">MIN</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text3)">P25</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--yellow)">MÉD.</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text3)">P75</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--green)">MAX</th>'
+      +'<th style="text-align:center;padding:5px 7px;font-size:10px;color:var(--text2)">MOY.</th>'
+      +'<th style="padding:5px 7px;min-width:80px;font-size:10px;color:var(--text3)">Distrib.</th>'
+      +'</tr></thead><tbody>';
+
+    defUnits.forEach(function(u,ri){
+      const raw=defLossDist[u.id]||[];
+      if(!raw.length) return;
+      const isD=DEF_IDS.has(u.id);
+      const arrP=raw.map(function(d){return typeof d==='object'?d.permLost:d;});
+      const arrR=raw.map(function(d){return typeof d==='object'?d.rebuilt||0:0;});
+      const arrRem=raw.map(function(d){return typeof d==='object'?d.remaining||0:0;});
+      const bg=ri%2===0?'transparent':'rgba(255,255,255,.02)';
+
+      /* Ligne pertes permanentes */
+      const mn2=Math.min(...arrP),p25=pct(arrP,25),med2=pct(arrP,50),p75=pct(arrP,75),mx2=Math.max(...arrP),avg2=mean(arrP);
+      html+='<tr style="background:'+bg+'">'
+        +'<td style="padding:6px 7px 2px 7px;color:var(--text);font-weight:600">'+u.name+'</td>'
+        +'<td style="padding:6px 7px 2px;text-align:center;color:var(--text3)">'+u.origCount+'</td>'
+        +'<td style="padding:6px 7px 2px;text-align:center;font-weight:700;color:'+(mn2>0?'var(--red)':'var(--green)')+'">'+mn2.toFixed(0)+'</td>'
+        +'<td style="padding:6px 7px 2px;text-align:center;color:var(--text2)">'+p25.toFixed(0)+'</td>'
+        +'<td style="padding:6px 7px 2px;text-align:center;font-weight:700;font-size:13px;color:var(--yellow)">'+med2.toFixed(0)+'</td>'
+        +'<td style="padding:6px 7px 2px;text-align:center;color:var(--text2)">'+p75.toFixed(0)+'</td>'
+        +'<td style="padding:6px 7px 2px;text-align:center;font-weight:700;color:'+(mx2>0?'var(--red)':'var(--green)')+'">'+mx2.toFixed(0)+'</td>'
+        +'<td style="padding:6px 7px 2px;text-align:center;color:var(--text2)">'+avg2.toFixed(1)+'</td>'
+        +'<td style="padding:6px 12px 2px 7px">'+sparkline(arrP,'var(--red)',u.origCount)+'</td>'
+        +'</tr>';
+
+      if(isD){
+        const rmn=Math.min(...arrR),rp25=pct(arrR,25),rmed=pct(arrR,50),rp75=pct(arrR,75),rmx=Math.max(...arrR),ravg=mean(arrR);
+        html+='<tr style="background:'+bg+'">'
+          +'<td style="padding:1px 7px 2px 16px;color:var(--green);font-size:11px;font-style:italic">↩ reconstruits</td>'
+          +'<td style="padding:1px 7px 2px;text-align:center;color:var(--text3);font-size:11px">—</td>'
+          +'<td style="padding:1px 7px 2px;text-align:center;color:var(--green);font-size:11px;font-weight:600">'+rmn.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 2px;text-align:center;color:var(--green);font-size:11px;opacity:.7">'+rp25.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 2px;text-align:center;color:var(--green);font-size:12px;font-weight:700">'+rmed.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 2px;text-align:center;color:var(--green);font-size:11px;opacity:.7">'+rp75.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 2px;text-align:center;color:var(--green);font-size:11px;font-weight:600">'+rmx.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 2px;text-align:center;color:var(--green);font-size:11px;opacity:.8">'+ravg.toFixed(1)+'</td>'
+          +'<td style="padding:1px 12px 2px 7px">'+sparkline(arrR,'var(--green)',u.origCount)+'</td>'
+          +'</tr>';
+        const smn=Math.min(...arrRem),sp25=pct(arrRem,25),smed=pct(arrRem,50),sp75=pct(arrRem,75),smx=Math.max(...arrRem),savg=mean(arrRem);
+        html+='<tr style="background:'+bg+';border-bottom:1px solid rgba(255,255,255,.06)">'
+          +'<td style="padding:1px 7px 6px 16px;color:var(--blue);font-size:11px;font-style:italic">✓ restants total</td>'
+          +'<td style="padding:1px 7px 6px;text-align:center;color:var(--text3);font-size:11px">—</td>'
+          +'<td style="padding:1px 7px 6px;text-align:center;color:var(--blue);font-size:11px;font-weight:600">'+smn.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 6px;text-align:center;color:var(--blue);font-size:11px;opacity:.7">'+sp25.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 6px;text-align:center;color:var(--blue);font-size:12px;font-weight:700">'+smed.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 6px;text-align:center;color:var(--blue);font-size:11px;opacity:.7">'+sp75.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 6px;text-align:center;color:var(--blue);font-size:11px;font-weight:600">'+smx.toFixed(0)+'</td>'
+          +'<td style="padding:1px 7px 6px;text-align:center;color:var(--blue);font-size:11px;opacity:.8">'+savg.toFixed(1)+'</td>'
+          +'<td style="padding:1px 12px 6px 7px">'+sparkline(arrRem,'var(--blue)',u.origCount)+'</td>'
+          +'</tr>';
+      } else {
+        html+='<tr style="border-bottom:1px solid rgba(255,255,255,.06)"><td colspan="9" style="padding:2px 0"></td></tr>';
+      }
+    });
+    html+='</tbody></table></div></div>';
+  }
+
+  body.innerHTML=html;
+  document.getElementById('dist-panel').style.display='block';
+}
+
+/* ─── PARTAGE ─── */
+let _lastLog=[], _lastWinner=null, _lastFleets=null;
+
+function encodeState(){
+  const atkUnits={}, defUnits={};
+  SHIPS.forEach(u=>{ const v=gv('atk-'+u.id); if(v) atkUnits[u.id]=v; });
+  [...SHIPS,...DEFS].forEach(u=>{ const v=gv('def-'+u.id); if(v) defUnits[u.id]=v; });
+  const cfg={aw:gv('atk-weapons'),as:gv('atk-shield'),aa:gv('atk-armor'),
+    dw:gv('def-weapons'),ds:gv('def-shield'),da:gv('def-armor'),
+    pf:gv('planet-fer'),ps:gv('planet-sil'),px:gv('planet-xen'),au:atkUnits,du:defUnits};
+  return btoa(unescape(encodeURIComponent(JSON.stringify({cfg,res:_lastShareState}))));
+}
+
+function decodeState(hash){ try{ return JSON.parse(decodeURIComponent(escape(atob(hash)))); }catch(e){ return null; } }
+
+function restoreFromHash(){
+  const hash=location.hash.slice(1);
+  if(!hash) return;
+  const state=decodeState(hash);
+  if(!state||!state.cfg||!state.res) return;
+  const{cfg,res}=state;
+  ['atk-weapons','atk-shield','atk-armor','def-weapons','def-shield','def-armor'].forEach(function(id,i){
+    const vals=[cfg.aw,cfg.as,cfg.aa,cfg.dw,cfg.ds,cfg.da];
+    const el=document.getElementById(id); if(el) el.value=vals[i]||0;
+  });
+  ['planet-fer','planet-sil','planet-xen'].forEach(function(id,key){
+    const vals={p:'planet-fer',k:'planet-sil',x:'planet-xen'};
+    const v=key===0?cfg.pf:key===1?cfg.ps:cfg.px;
+    const el=document.getElementById(id); if(el) el.value=v||0;
+  });
+  Object.entries(cfg.au||{}).forEach(function([id,v]){ const el=document.getElementById('atk-'+id); if(el){el.value=v;el.closest('.urow')?.classList.toggle('on',v>0);} });
+  Object.entries(cfg.du||{}).forEach(function([id,v]){ const el=document.getElementById('def-'+id); if(el){el.value=v;el.closest('.urow')?.classList.toggle('on',v>0);} });
+  const r=res;
+  const out=document.getElementById('res-outcome');
+  if(r.aw>=r.dw&&r.aw>=r.dr){out.textContent='⚔ Victoire — Attaque';out.className='outcome o-atk';}
+  else if(r.dw>=r.aw&&r.dw>=r.dr){out.textContent='🛡 Victoire — Défense';out.className='outcome o-def';}
+  else{out.textContent='⚖ Égalité';out.className='outcome o-draw';}
+  document.getElementById('res-atk-pct').textContent=r.ap+'%';
+  document.getElementById('res-def-pct').textContent=r.dp+'%';
+  document.getElementById('res-draw-pct').textContent=r.rp+'%';
+  document.getElementById('res-rounds').textContent=r.ar;
+  document.getElementById('bar-atk').style.width=r.ap2+'%'; document.getElementById('pct-atk').textContent=r.ap2+'%';
+  document.getElementById('bar-def').style.width=r.dp2+'%'; document.getElementById('pct-def').textContent=r.dp2+'%';
+  if(r.tbl_atk) document.getElementById('tbl-atk').innerHTML=r.tbl_atk;
+  if(r.tbl_def) document.getElementById('tbl-def').innerHTML=r.tbl_def;
+  ['atk-fer','atk-sil','atk-xen','def-fer','def-sil','def-xen','deb-fer','deb-sil','loot-fer','loot-sil','loot-xen'].forEach(function(id){
+    const v=r[id.replace('-','_')]; if(v&&document.getElementById(id)) document.getElementById(id).textContent=v;
+  });
+  if(r.log) document.getElementById('log-body').innerHTML=r.log;
+  document.getElementById('res-panel').classList.add('v');
+  document.getElementById('log-panel').classList.add('v');
+  _lastShareState=r;
+  const banner=document.createElement('div');
+  banner.style.cssText='grid-column:1/-1;background:var(--purple-bg);border:1px solid var(--purple-bd);border-radius:var(--r-md);padding:10px 16px;font-size:12px;color:#b0a0f8;text-align:center;';
+  banner.innerHTML='📋 Rapport partagé — <strong>relance la simulation</strong> pour de nouveaux résultats';
+  document.querySelector('.sim-row').after(banner);
+}
+
+document.addEventListener('DOMContentLoaded', restoreFromHash);
+
+/* ─── EXPORT RAPPORT ─── */
+function exportReport(){
+  if(!_lastLog.length) return;
+  const{ab,db}=_lastFleets||{};
+  const lines=['═══════════════════════════════════════════════','  SOLARIS — RAPPORT DE COMBAT (sim unique)','═══════════════════════════════════════════════',''];
+  if(ab&&db){
+    lines.push('FLOTTE D\'ATTAQUE :');
+    ab.forEach(u=>lines.push('  '+u.origCount+'x '+u.name+'  [ATK:'+u.atk+' BOU:'+u.bou+' HULL:'+u.cqu+']'));
+    lines.push('  Tech armes: +'+gv('atk-weapons')+'nv  bouclier: +'+gv('atk-shield')+'nv  coque: +'+gv('atk-armor')+'nv');
+    lines.push('');
+    lines.push('FLOTTE DE DÉFENSE :');
+    db.forEach(u=>lines.push('  '+u.origCount+'x '+u.name+'  [ATK:'+u.atk+' BOU:'+u.bou+' HULL:'+u.cqu+']'));
+    lines.push('  Tech armes: +'+gv('def-weapons')+'nv  bouclier: +'+gv('def-shield')+'nv  coque: +'+gv('def-armor')+'nv');
+    lines.push('');
+  }
+  lines.push('RÈGLES MOTEUR :');
+  lines.push('  • Bounce : ATK < 1% du bouclier MAX de la cible');
+  lines.push('  • Explosion : check fin de round si hull < 70% hullMax');
+  lines.push('  • Cibles : pool = hull > 0 et pas mort ce round');
+  lines.push('  • Bouclier : régénération 100% fin de round');
+  lines.push('  • Max 6 rounds');
+  lines.push('');
+  lines.push('───────────────────────────────────────────────');
+  lines.push('DÉROULEMENT :');
+  lines.push('');
+  _lastLog.forEach(function(l){
+    if(typeof l!=='object'||!l.round) return;
+    lines.push('[Round '+l.round+']');
+    lines.push('  Survivants → ATK: '+l.atkAlive+'/'+l.atkTotal+' | DEF: '+l.defAlive+'/'+l.defTotal);
+    lines.push('  ATK→DEF  Bouclier: '+l.dmgShieldOnDef+'  Hull: '+l.dmgHullOnDef+'  Pertes DEF: '+l.defLostStr);
+    lines.push('  DEF→ATK  Bouclier: '+l.dmgShieldOnAtk+'  Hull: '+l.dmgHullOnAtk+'  Pertes ATK: '+l.atkLostStr);
+    if(l.explTotal>0) lines.push('  Explosions: '+l.explTotal+'  Checks: '+l.checksTotal);
+    lines.push('');
+  });
+  lines.push('───────────────────────────────────────────────');
+  lines.push('RÉSULTAT : '+(_lastWinner==='atk'?'VICTOIRE ATTAQUANT':_lastWinner==='def'?'VICTOIRE DÉFENSEUR':'ÉGALITÉ'));
+  lines.push('═══════════════════════════════════════════════');
+  const text=lines.join('\n');
+  navigator.clipboard.writeText(text).then(function(){
+    const btn=document.getElementById('btn-export');
+    btn.textContent='✓ Copié !'; btn.style.color='var(--green)';
+    setTimeout(function(){btn.textContent='📋 Copier le rapport';btn.style.color='';},2000);
+  }).catch(function(){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); });
+}
+</script>
+</body>
+</html>

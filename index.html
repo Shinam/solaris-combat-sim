@@ -380,6 +380,14 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
   <!-- SIM ROW -->
   <div class="sim-row">
     <div class="ss">
+      <span class="ss-lbl" style="color:var(--text3)">Moteur</span>
+      <div class="sim-opts" id="sim-engine-opts">
+        <button type="button" class="sim-opt on" data-engine="api" onclick="setSimEngine('api')">API Go</button>
+        <button type="button" class="sim-opt" data-engine="worker" onclick="setSimEngine('worker')">Worker JS</button>
+      </div>
+      <span id="sim-engine-hint" style="font-size:10px;color:var(--text3)">serveur local :8765</span>
+    </div>
+    <div class="ss">
       <span class="ss-lbl" style="color:var(--text3)">Nombre de simulations</span>
       <div class="sim-opts" id="sim-count-opts">
         <button type="button" class="sim-opt" data-n="10" onclick="setSimCount(10)">10</button>
@@ -388,7 +396,11 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
       </div>
       <span id="sim-count-hint" style="font-size:10px;color:var(--text3)">statistiquement stable</span>
     </div>
-    <button class="btn-sim" onclick="runSim()">Lancer la Bataille</button>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+      <button class="btn-sim" onclick="runSim()">Lancer la Bataille</button>
+      <button class="btn-spy" onclick="runCompare()" style="margin-left:0">⚡ Comparer Go vs JS</button>
+      <span id="sim-timing" style="font-size:11px;color:var(--text3);min-height:16px"></span>
+    </div>
   </div>
 
   <!-- RÉSULTATS -->
@@ -931,15 +943,80 @@ self.onmessage=function(e){
 /* ─── LANCER LA SIMULATION ─── */
 let activeWorker = null;
 let simCount = 1000;
+let simEngine = 'api'; // 'api' | 'worker'
+let activeAbort = null;
+
+/* URL API : même origine si servi par Go, sinon localhost:8090, surcharge via ?api= */
+const API_BASE = (() => {
+  const q = new URLSearchParams(location.search).get('api');
+  if (q) return q.replace(/\/$/, '');
+  // Servi par le binaire Go (même host/port)
+  if (location.protocol.startsWith('http') && (location.port === '8765' || location.port === '8090' || location.port === '8080' || location.hostname.includes('onrender.com'))) {
+    return location.origin;
+  }
+  return 'http://127.0.0.1:8765';
+})();
 
 const SIM_COUNT_HINTS = {10:'rapide — aperçu', 100:'équilibré', 1000:'statistiquement stable'};
 function fmtSimCount(n){ return n.toLocaleString('fr-FR'); }
+function fmtMs(ms){ return ms < 1000 ? Math.round(ms)+' ms' : (ms/1000).toFixed(2)+' s'; }
 
 function setSimCount(n){
   simCount=n;
-  document.querySelectorAll('.sim-opt').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.n,10)===n));
+  document.querySelectorAll('#sim-count-opts .sim-opt').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.n,10)===n));
   const hint=document.getElementById('sim-count-hint');
   if(hint) hint.textContent=SIM_COUNT_HINTS[n]||'';
+}
+
+function setSimEngine(eng){
+  simEngine=eng;
+  document.querySelectorAll('#sim-engine-opts .sim-opt').forEach(b=>b.classList.toggle('on',b.dataset.engine===eng));
+  const hint=document.getElementById('sim-engine-hint');
+  if(hint) hint.textContent=eng==='api' ? ('API · '+API_BASE) : 'Web Worker navigateur';
+}
+
+function initApp(){
+  try{
+    setSimEngine('api');
+    restoreFromHash();
+  }catch(e){
+    console.error(e);
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#e04a5a;color:#fff;padding:12px 16px;font-size:13px;text-align:center';
+    banner.textContent='Erreur JS au démarrage : '+(e.message||e);
+    document.body.prepend(banner);
+  }
+}
+document.addEventListener('DOMContentLoaded', initApp);
+
+function setTiming(msg, color){
+  const t=document.getElementById('sim-timing');
+  if(!t) return;
+  t.textContent=msg||'';
+  t.style.color=color||'var(--text3)';
+}
+
+function showLoading(n){
+  const el=id=>document.getElementById(id);
+  el('loading').classList.add('on');
+  el('prog-fill').style.width='0%';
+  el('prog-done').textContent='0 / '+fmtSimCount(n);
+  el('prog-pct').textContent='0%';
+  el('prog-live').textContent='Initialisation…';
+}
+function hideLoading(){ document.getElementById('loading').classList.remove('on'); }
+function setProgress(done,total,aw,dw,dr){
+  const el=id=>document.getElementById(id);
+  const pct=Math.round(done/total*100);
+  el('prog-fill').style.width=pct+'%';
+  el('prog-done').textContent=done+' / '+total;
+  el('prog-pct').textContent=pct+'%';
+  if(done>0) el('prog-live').textContent='ATK '+Math.round(aw/done*100)+'%  |  DEF '+Math.round(dw/done*100)+'%  |  Ég. '+Math.round(dr/done*100)+'%';
+}
+
+function stopActiveSim(){
+  if(activeWorker){ activeWorker.terminate(); activeWorker=null; }
+  if(activeAbort){ activeAbort.abort(); activeAbort=null; }
 }
 
 function runSim() {
@@ -951,38 +1028,146 @@ function runSim() {
   const totDef=db.reduce((s,u)=>s+u.origCount,0);
   if(!totAtk&&!totDef){ alert('Ajoutez des unités des deux côtés !'); return; }
 
-  if(activeWorker){ activeWorker.terminate(); activeWorker=null; }
+  stopActiveSim();
+  showLoading(simCount);
+  setTiming(simEngine==='api' ? 'Appel API Go…' : 'Worker JS…');
 
-  const el=id=>document.getElementById(id);
-  el('loading').classList.add('on');
-  el('prog-fill').style.width='0%';
-  el('prog-done').textContent='0 / '+fmtSimCount(simCount);
-  el('prog-pct').textContent='0%';
-  el('prog-live').textContent='Initialisation…';
-
-  const blob=new Blob([WORKER_SRC],{type:'application/javascript'});
-  const url=URL.createObjectURL(blob);
-  activeWorker=new Worker(url);
-  URL.revokeObjectURL(url);
-
-  activeWorker.onmessage=function(e){
-    const d=e.data;
-    if(d.type==='progress'){
-      const pct=Math.round(d.done/d.total*100);
-      el('prog-fill').style.width=pct+'%';
-      el('prog-done').textContent=d.done+' / '+d.total;
-      el('prog-pct').textContent=pct+'%';
-      el('prog-live').textContent='ATK '+Math.round(d.aw/d.done*100)+'%  |  DEF '+Math.round(d.dw/d.done*100)+'%  |  Ég. '+Math.round(d.dr/d.done*100)+'%';
-      return;
-    }
-    if(d.type==='done'){
-      el('loading').classList.remove('on');
-      activeWorker=null;
-      renderResults(d, ab, db, totAtk, totDef);
-    }
+  const t0 = performance.now();
+  const onDone = (d, label, serverMs) => {
+    hideLoading();
+    const clientMs = performance.now() - t0;
+    const parts = [label, fmtMs(clientMs)+' (client)'];
+    if(serverMs!=null) parts.push(fmtMs(serverMs)+' (serveur)');
+    setTiming(parts.join(' · '), 'var(--green)');
+    renderResults(d, ab, db, totAtk, totDef);
   };
-  activeWorker.onerror=function(err){ console.error(err); el('loading').classList.remove('on'); };
-  activeWorker.postMessage({ab,db,n:simCount});
+  const onErr = (err) => {
+    hideLoading();
+    console.error(err);
+    setTiming('Erreur : '+(err.message||err), 'var(--red)');
+    alert('Erreur simulation : '+(err.message||err));
+  };
+
+  if(simEngine==='api'){
+    runViaAPI(ab, db, simCount).then(({data, serverMs})=>onDone(data,'API Go',serverMs)).catch(onErr);
+  } else {
+    runViaWorker(ab, db, simCount).then(data=>onDone(data,'Worker JS',null)).catch(onErr);
+  }
+}
+
+async function runViaAPI(ab, db, n){
+  activeAbort = new AbortController();
+  const prog = document.getElementById('prog-live');
+  if(prog) prog.textContent='Calcul côté serveur Go…';
+  // Fake progress while waiting (server has no SSE yet)
+  let fake=0;
+  const tick=setInterval(()=>{
+    fake=Math.min(n-1, fake+Math.max(1,Math.floor(n/30)));
+    setProgress(fake, n, 0, 0, 0);
+    const el=document.getElementById('prog-live');
+    if(el) el.textContent='Calcul côté serveur Go…';
+  }, 120);
+
+  try{
+    const res = await fetch(API_BASE+'/simulate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ab, db, n}),
+      signal: activeAbort.signal,
+    });
+    clearInterval(tick);
+    if(!res.ok){
+      const txt = await res.text();
+      throw new Error(res.status+' '+txt);
+    }
+    const serverMs = parseInt(res.headers.get('X-Sim-Duration-Ms')||'',10);
+    const data = await res.json();
+    setProgress(n, n, data.aw||0, data.dw||0, data.dr||0);
+    activeAbort = null;
+    return {data, serverMs: Number.isFinite(serverMs)?serverMs:null};
+  } catch(e){
+    clearInterval(tick);
+    activeAbort = null;
+    throw e;
+  }
+}
+
+function runViaWorker(ab, db, n){
+  return new Promise((resolve, reject)=>{
+    const blob=new Blob([WORKER_SRC],{type:'application/javascript'});
+    const url=URL.createObjectURL(blob);
+    activeWorker=new Worker(url);
+    URL.revokeObjectURL(url);
+    activeWorker.onmessage=function(e){
+      const d=e.data;
+      if(d.type==='progress'){
+        setProgress(d.done,d.total,d.aw,d.dw,d.dr);
+        return;
+      }
+      if(d.type==='done'){
+        activeWorker=null;
+        resolve(d);
+      }
+    };
+    activeWorker.onerror=function(err){
+      activeWorker=null;
+      reject(err.message||err);
+    };
+    activeWorker.postMessage({ab,db,n});
+  });
+}
+
+/* Lance Go puis JS sur la même flotte, affiche temps + écarts de % */
+async function runCompare(){
+  const aw=gv('atk-weapons'), as_=gv('atk-shield'), aa=gv('atk-armor');
+  const dw=gv('def-weapons'), ds=gv('def-shield'),  da=gv('def-armor');
+  const ab=buildFleetData('atk',aw,as_,aa);
+  const db=buildFleetData('def',dw,ds,da);
+  const totAtk=ab.reduce((s,u)=>s+u.origCount,0);
+  const totDef=db.reduce((s,u)=>s+u.origCount,0);
+  if(!totAtk&&!totDef){ alert('Ajoutez des unités des deux côtés !'); return; }
+
+  stopActiveSim();
+  showLoading(simCount);
+  setTiming('Comparaison Go vs JS…');
+
+  try{
+    const tGo0 = performance.now();
+    document.getElementById('prog-live').textContent='1/2 — API Go…';
+    const {data: goData, serverMs} = await runViaAPI(ab, db, simCount);
+    const tGo = performance.now() - tGo0;
+
+    document.getElementById('prog-live').textContent='2/2 — Worker JS…';
+    showLoading(simCount);
+    const tJs0 = performance.now();
+    const jsData = await runViaWorker(ab, db, simCount);
+    const tJs = performance.now() - tJs0;
+
+    hideLoading();
+    // Affiche les résultats Go (source de vérité cible)
+    renderResults(goData, ab, db, totAtk, totDef);
+
+    const pct = (a,b,n)=>((a/n)*100).toFixed(1)+'% / '+((b/n)*100).toFixed(1)+'%';
+    const speedup = tJs > 0 ? (tJs/tGo).toFixed(1)+'×' : '—';
+    const delta = Math.abs(goData.aw-jsData.aw)+Math.abs(goData.dw-jsData.dw)+Math.abs(goData.dr-jsData.dr);
+    const deltaPct = (delta/simCount*100).toFixed(1);
+
+    setTiming(
+      'Go '+fmtMs(tGo)+(serverMs!=null?' (serveur '+fmtMs(serverMs)+')':'')
+      +'  vs  JS '+fmtMs(tJs)
+      +'  →  '+speedup+' plus rapide'
+      +'  |  ATK '+pct(goData.aw,jsData.aw,simCount)
+      +'  DEF '+pct(goData.dw,jsData.dw,simCount)
+      +'  Δ wins '+delta+' ('+deltaPct+' pts)',
+      delta/simCount < 0.05 ? 'var(--green)' : 'var(--yellow)'
+    );
+    console.log('[compare]', {go:{aw:goData.aw,dw:goData.dw,dr:goData.dr,ms:tGo,serverMs}, js:{aw:jsData.aw,dw:jsData.dw,dr:jsData.dr,ms:tJs}, delta, speedup});
+  } catch(err){
+    hideLoading();
+    console.error(err);
+    setTiming('Erreur comparaison : '+(err.message||err), 'var(--red)');
+    alert('Erreur comparaison : '+(err.message||err)+'\n\nLance le serveur : go run ./cmd/server');
+  }
 }
 
 /* ─── RENDU RÉSULTATS ─── */
@@ -1375,7 +1560,7 @@ function restoreFromHash(){
   document.querySelector('.sim-row').after(banner);
 }
 
-document.addEventListener('DOMContentLoaded', restoreFromHash);
+document.addEventListener('DOMContentLoaded', initApp);
 
 /* ─── EXPORT RAPPORT ─── */
 function exportReport(){

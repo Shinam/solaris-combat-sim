@@ -1,0 +1,5 @@
+.tools/
+*.exe
+*.test
+/solaris-api
+.DS_Store
