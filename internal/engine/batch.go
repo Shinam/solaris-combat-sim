@@ -2,7 +2,9 @@ package engine
 
 import (
 	"math/rand"
+	"os"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -11,6 +13,26 @@ import (
 // ProgressFunc is called periodically during a batch (optional).
 type ProgressFunc func(done, total, aw, dw, dr int)
 
+// workerCount chooses parallelism. On free hosts, keep it low to avoid OOM.
+func workerCount(n int) int {
+	workers := runtime.GOMAXPROCS(0)
+	if env := os.Getenv("MAX_WORKERS"); env != "" {
+		if v, err := strconv.Atoi(env); err == nil && v > 0 {
+			workers = v
+		}
+	} else if workers > 2 {
+		// Safe default for small cloud instances (Render free ≈ 512MB)
+		workers = 2
+	}
+	if workers > n {
+		workers = n
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	return workers
+}
+
 // RunBatch runs n independent simulations in parallel and aggregates
 // results exactly like the JS Web Worker loop.
 func RunBatch(ab, db []UnitType, n int, onProgress ProgressFunc) BatchResult {
@@ -18,13 +40,7 @@ func RunBatch(ab, db []UnitType, n int, onProgress ProgressFunc) BatchResult {
 		n = 1
 	}
 
-	workers := runtime.GOMAXPROCS(0)
-	if workers > n {
-		workers = n
-	}
-	if workers < 1 {
-		workers = 1
-	}
+	workers := workerCount(n)
 
 	type partial struct {
 		aw, dw, dr, totRounds int
@@ -37,7 +53,7 @@ func RunBatch(ab, db []UnitType, n int, onProgress ProgressFunc) BatchResult {
 		lastIndex             int
 	}
 
-	jobs := make(chan int, n)
+	jobs := make(chan int, workers*2)
 	var wg sync.WaitGroup
 	results := make([]partial, workers)
 
@@ -49,6 +65,7 @@ func RunBatch(ab, db []UnitType, n int, onProgress ProgressFunc) BatchResult {
 	}
 
 	seedBase := time.Now().UnixNano()
+	perWorkerCap := n/workers + 8
 
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
@@ -62,13 +79,13 @@ func RunBatch(ab, db []UnitType, n int, onProgress ProgressFunc) BatchResult {
 			p.defLossDist = make(map[string][]DefLossDetail, len(db))
 			for _, u := range ab {
 				p.atkSurvAcc[u.ID] = 0
-				p.atkLossDist[u.ID] = make([]int, 0, n/workers+1)
+				p.atkLossDist[u.ID] = make([]int, 0, perWorkerCap)
 			}
 			for _, u := range db {
 				p.defSurvAcc[u.ID] = 0
-				p.defLossDist[u.ID] = make([]DefLossDetail, 0, n/workers+1)
+				p.defLossDist[u.ID] = make([]DefLossDetail, 0, perWorkerCap)
 			}
-			p.roundsDist = make([]int, 0, n/workers+1)
+			p.roundsDist = make([]int, 0, perWorkerCap)
 			p.lastIndex = -1
 
 			for i := range jobs {
@@ -114,10 +131,12 @@ func RunBatch(ab, db []UnitType, n int, onProgress ProgressFunc) BatchResult {
 		}(w)
 	}
 
-	for i := 0; i < n; i++ {
-		jobs <- i
-	}
-	close(jobs)
+	go func() {
+		for i := 0; i < n; i++ {
+			jobs <- i
+		}
+		close(jobs)
+	}()
 	wg.Wait()
 
 	out := BatchResult{

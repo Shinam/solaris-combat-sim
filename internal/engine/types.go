@@ -69,18 +69,19 @@ type SimResult struct {
 
 // BatchResult matches the Web Worker "done" payload.
 type BatchResult struct {
-	Type        string                   `json:"type"`
-	AW          int                      `json:"aw"`
-	DW          int                      `json:"dw"`
-	DR          int                      `json:"dr"`
-	N           int                      `json:"n"`
-	TotRounds   int                      `json:"totRounds"`
-	AtkSurvAcc  map[string]int           `json:"atkSurvAcc"`
-	DefSurvAcc  map[string]int           `json:"defSurvAcc"`
-	LastLog     []RoundLog               `json:"lastLog"`
-	AtkLossDist map[string][]int         `json:"atkLossDist"`
+	Type        string                     `json:"type"`
+	AW          int                        `json:"aw"`
+	DW          int                        `json:"dw"`
+	DR          int                        `json:"dr"`
+	N           int                        `json:"n"`
+	TotRounds   int                        `json:"totRounds"`
+	DurationMs  int64                      `json:"durationMs,omitempty"`
+	AtkSurvAcc  map[string]int             `json:"atkSurvAcc"`
+	DefSurvAcc  map[string]int             `json:"defSurvAcc"`
+	LastLog     []RoundLog                 `json:"lastLog"`
+	AtkLossDist map[string][]int           `json:"atkLossDist"`
 	DefLossDist map[string][]DefLossDetail `json:"defLossDist"`
-	RoundsDist  []int                    `json:"roundsDist"`
-	AB          []UnitType               `json:"ab"`
-	DB          []UnitType               `json:"db"`
+	RoundsDist  []int                      `json:"roundsDist"`
+	AB          []UnitType                 `json:"ab"`
+	DB          []UnitType                 `json:"db"`
 }

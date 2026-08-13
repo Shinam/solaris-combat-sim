@@ -305,6 +305,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
     </div>
   </div>
   <div class="loading-sub" id="prog-live">Initialisation…</div>
+  <div class="loading-sub" id="prog-elapsed" style="color:var(--yellow);font-weight:600">0.0 s</div>
 </div>
 
 <!-- HEADER -->
@@ -380,14 +381,6 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
   <!-- SIM ROW -->
   <div class="sim-row">
     <div class="ss">
-      <span class="ss-lbl" style="color:var(--text3)">Moteur</span>
-      <div class="sim-opts" id="sim-engine-opts">
-        <button type="button" class="sim-opt on" data-engine="api" onclick="setSimEngine('api')">API Go</button>
-        <button type="button" class="sim-opt" data-engine="worker" onclick="setSimEngine('worker')">Worker JS</button>
-      </div>
-      <span id="sim-engine-hint" style="font-size:10px;color:var(--text3)">serveur local :8765</span>
-    </div>
-    <div class="ss">
       <span class="ss-lbl" style="color:var(--text3)">Nombre de simulations</span>
       <div class="sim-opts" id="sim-count-opts">
         <button type="button" class="sim-opt" data-n="10" onclick="setSimCount(10)">10</button>
@@ -398,7 +391,6 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
       <button class="btn-sim" onclick="runSim()">Lancer la Bataille</button>
-      <button class="btn-spy" onclick="runCompare()" style="margin-left:0">⚡ Comparer Go vs JS</button>
       <span id="sim-timing" style="font-size:11px;color:var(--text3);min-height:16px"></span>
     </div>
   </div>
@@ -486,11 +478,10 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
 
 <script>
 /* ═══════════════════════════════════════════════════════════
-   SOLARIS COMBAT SIMULATOR — JS UNIQUE ET PROPRE
+   SOLARIS COMBAT SIMULATOR
    Architecture :
-   • DONNÉES & UI : thread principal
-   • MOTEUR DE COMBAT : 100% dans le Web Worker (WORKER_SRC)
-   • Pas de duplication de code moteur
+   • DONNÉES & UI : frontend
+   • MOTEUR DE COMBAT : API Go (/simulate)
 ═══════════════════════════════════════════════════════════ */
 
 /* ─── DONNÉES VAISSEAUX & DÉFENSES ─── */
@@ -521,24 +512,6 @@ const DEFS = [
   {id:'bouclier_g',  name:'Grand Bouclier Plan.',fer:50000, sil:50000,xen:0,    atk:1,    bou:10000,cqu:10000 },
 ];
 const DEF_IDS = new Set(DEFS.map(d=>d.id));
-
-/* ─── RAPIDFIRE ─── */
-const RF = {
-  'nova_scout':    {'spectre_s':5,'helios_r':5},
-  'fer_de_lance':  {'atlas_cargo':3,'spectre_s':5,'helios_r':5},
-  'cyclone':       {'nova_scout':6,'spectre_s':5,'helios_r':5,'tourelle_c':10},
-  'bastion':       {'spectre_s':5,'helios_r':5},
-  'pyro':          {'spectre_s':5,'helios_r':5,'tourelle_c':20,'canon_imp':20,'canon_fais':10,'proj_ion':10,'canon_m':5,'canon_sol':5},
-  'nemesis':       {'atlas_cargo':3,'atlas_cargo_xl':3,'nova_scout':4,'fer_de_lance':4,'cyclone':4,'bastion':7,'spectre_s':5,'helios_r':5},
-  'fulgurant':     {'spectre_s':5,'helios_r':5,'nemesis':2,'canon_imp':10},
-  'titan_astral':  {
-    'atlas_cargo':250,'atlas_cargo_xl':250,'nova_scout':200,'fer_de_lance':100,
-    'cyclone':33,'bastion':30,'pyro':25,'fulgurant':5,
-    'spectre_s':1250,'helios_r':1250,'barge_col':250,'manta_recup':250,
-    'nemesis':15,'tourelle_c':200,'canon_imp':200,'canon_fais':100,
-    'proj_ion':100,'canon_m':50,
-  },
-};
 
 /* ─── UTILS ─── */
 const sf = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n);
@@ -717,7 +690,7 @@ function openShare()  { if(!_lastShareState) return; document.getElementById('sh
 function closeShare(e){ if(e&&e.target!==document.getElementById('share-back')) return; document.getElementById('share-back').classList.remove('open'); }
 function copyShareUrl(){ const i=document.getElementById('share-url'); navigator.clipboard.writeText(i.value).then(()=>{ const b=document.getElementById('btn-copy'); b.textContent='✓ Copié !'; b.classList.add('copied'); setTimeout(()=>{b.textContent='Copier';b.classList.remove('copied');},2000); }).catch(()=>{i.select();document.execCommand('copy');}); }
 
-/* ─── BUILD FLEET DATA (sérialisable pour Worker) ─── */
+/* ─── BUILD FLEET DATA (payload API) ─── */
 function buildFleetData(prefix, w, s, a) {
   const all = prefix==='atk' ? [...SHIPS] : [...SHIPS,...DEFS];
   return all.map(u => {
@@ -729,232 +702,21 @@ function buildFleetData(prefix, w, s, a) {
   }).filter(Boolean);
 }
 
-/* ─── WEB WORKER (moteur de combat complet) ─── */
-const WORKER_SRC = `
-const RF={
-  'nova_scout':    {'spectre_s':5,'helios_r':5},
-  'fer_de_lance':  {'atlas_cargo':3,'spectre_s':5,'helios_r':5},
-  'cyclone':       {'nova_scout':6,'spectre_s':5,'helios_r':5,'tourelle_c':10},
-  'bastion':       {'spectre_s':5,'helios_r':5},
-  'pyro':          {'spectre_s':5,'helios_r':5,'tourelle_c':20,'canon_imp':20,'canon_fais':10,'proj_ion':10,'canon_m':5,'canon_sol':5},
-  'nemesis':       {'atlas_cargo':3,'atlas_cargo_xl':3,'nova_scout':4,'fer_de_lance':4,'cyclone':4,'bastion':7,'spectre_s':5,'helios_r':5},
-  'fulgurant':     {'spectre_s':5,'helios_r':5,'nemesis':2,'canon_imp':10},
-  'titan_astral':{
-    'atlas_cargo':250,'atlas_cargo_xl':250,'nova_scout':200,'fer_de_lance':100,
-    'cyclone':33,'bastion':30,'pyro':25,'fulgurant':5,
-    'spectre_s':1250,'helios_r':1250,'barge_col':250,'manta_recup':250,
-    'nemesis':15,'tourelle_c':200,'canon_imp':200,'canon_fais':100,
-    'proj_ion':100,'canon_m':50,
-  },
-};
-const DEF_IDS=new Set(['tourelle_c','canon_imp','canon_fais','canon_m','proj_ion','canon_sol','bouclier_p','bouclier_g']);
-
-function makeEntities(u){
-  const arr=[];
-  for(let i=0;i<u.count;i++) arr.push({id:u.id+'_'+i,typeId:u.id,name:u.name,atk:u.atk,bou:u.bou,hullMax:u.cqu,hull:u.cqu,sp:u.bou,dead:false,removed:false});
-  return arr;
-}
-
-function countAlive(fleet){ return fleet.filter(e=>!e.removed).length; }
-
-function countByType(fleet){
-  const m={};
-  fleet.filter(e=>!e.removed&&!e.dead&&e.hull>0).forEach(e=>{ m[e.typeId]=(m[e.typeId]||0)+1; });
-  return m;
-}
-
-function fireOneShot(unit, targets, pendingDamage){
-  const alive=targets.filter(t=>t.hull>0);
-  if(!alive.length) return null;
-  const target=alive[Math.floor(Math.random()*alive.length)];
-  if(unit.atk<=target.bou*0.01) return target.typeId; /* bounce */
-  const key=target.id;
-  const pending=pendingDamage.get(key)||{shield:0,hull:0};
-  const effShield=Math.max(0,target.sp-pending.shield);
-  if(effShield>0){
-    const abs=Math.min(effShield,unit.atk);
-    pending.shield+=abs;
-    const rem=unit.atk-abs;
-    if(rem>0) pending.hull+=rem;
-  } else { pending.hull+=unit.atk; }
-  pendingDamage.set(key,pending);
-  return target.typeId;
-}
-
-function fireOneUnit(unit, targets, pendingDamage){
-  const rfMap=RF[unit.typeId]||{};
-  let keep=true, shots=0;
-  while(keep){
-    shots++; if(shots>2000) break;
-    const hitId=fireOneShot(unit,targets,pendingDamage);
-    if(hitId===null) break;
-    const rf=rfMap[hitId]||0;
-    if(rf<=1){ keep=false; break; }
-    if(Math.random()>=(1-1/rf)) keep=false;
-  }
-}
-
-function fireRoundSimultaneous(atk, def){
-  /* Dégâts accumulés avant application — exactement comme Solaris */
-  const pendingOnDef=new Map(), pendingOnAtk=new Map();
-  atk.forEach(u=>{ if(u.hull>0) fireOneUnit(u,def,pendingOnDef); });
-  def.forEach(u=>{ if(u.hull>0) fireOneUnit(u,atk,pendingOnAtk); });
-
-  let sdDef=0,hdDef=0,sdAtk=0,hdAtk=0;
-
-  def.forEach(u=>{
-    const p=pendingOnDef.get(u.id); if(!p) return;
-    const sd=Math.min(u.sp,p.shield); u.sp-=sd; sdDef+=sd;
-    const hd=p.hull+(p.shield-sd); if(hd>0){ u.hull-=hd; hdDef+=hd; if(u.hull<0)u.hull=0; }
-  });
-  atk.forEach(u=>{
-    const p=pendingOnAtk.get(u.id); if(!p) return;
-    const sd=Math.min(u.sp,p.shield); u.sp-=sd; sdAtk+=sd;
-    const hd=p.hull+(p.shield-sd); if(hd>0){ u.hull-=hd; hdAtk+=hd; if(u.hull<0)u.hull=0; }
-  });
-
-  /* Explosions + reset bouclier par unité (Solaris exact) */
-  let explosions=0, checks=0;
-  [...atk,...def].forEach(u=>{
-    if(u.hull>0 && u.hull<u.hullMax*0.7){
-      checks++;
-      if(Math.random()<1-(u.hull/u.hullMax)){ u.hull=0; explosions++; return; }
-    }
-    if(u.hull>0) u.sp=u.bou;
-  });
-
-  return{sdDef:Math.round(sdDef),hdDef:Math.round(hdDef),
-    sdAtk:Math.round(sdAtk),hdAtk:Math.round(hdAtk),explosions,checks};
-}
-
-function lostStr(before,after){
-  const out=[];
-  for(const[id,n] of Object.entries(before)){ const l=n-(after[id]||0); if(l>0) out.push(l+'x '+id.replace(/_/g,' ')); }
-  return out.length?out.join(', '):'Aucune perte';
-}
-
-function lostCount(before,after){
-  return Object.entries(before).reduce((s,[id,n])=>s+(n-(after[id]||0)),0);
-}
-
-function simulate(ab,db){
-  const atkTotal=ab.reduce((s,u)=>s+u.origCount,0);
-  const defTotal=db.reduce((s,u)=>s+u.origCount,0);
-  let atk=[]; ab.forEach(u=>atk=atk.concat(makeEntities(u)));
-  let def=[]; db.forEach(u=>def=def.concat(makeEntities(u)));
-  const log=[];
-
-  for(let r=0;r<6;r++){
-    /* Vivants = hull > 0 (pas de flag dead/removed, comme Solaris) */
-    const atkAliveStart=atk.filter(e=>e.hull>0).length;
-    const defAliveStart=def.filter(e=>e.hull>0).length;
-    if(!atkAliveStart||!defAliveStart) break;
-
-    const atkBefore=countByType(atk.filter(e=>e.hull>0));
-    const defBefore=countByType(def.filter(e=>e.hull>0));
-
-    const res=fireRoundSimultaneous(atk,def);
-
-    /* Compter après application */
-    const atkAfterArr=atk.filter(e=>e.hull>0);
-    const defAfterArr=def.filter(e=>e.hull>0);
-    const atkAfter=countByType(atkAfterArr);
-    const defAfter=countByType(defAfterArr);
-    const ra=atkAfterArr.length, rd=defAfterArr.length;
-
-    log.push({round:r+1,atkAlive:ra,defAlive:rd,atkTotal,defTotal,
-      dmgShieldOnDef:res.sdDef,dmgHullOnDef:res.hdDef,
-      defLostStr:lostStr(defBefore,defAfter),defLostCount:lostCount(defBefore,defAfter),
-      dmgShieldOnAtk:res.sdAtk,dmgHullOnAtk:res.hdAtk,
-      atkLostStr:lostStr(atkBefore,atkAfter),atkLostCount:lostCount(atkBefore,atkAfter),
-      explTotal:res.explosions,checksTotal:res.checks,
-    });
-    if(!ra||!rd) break;
-  }
-
-  const al=atk.filter(e=>e.hull>0).length;
-  const dl=def.filter(e=>e.hull>0).length;
-  const winner=al>0&&dl===0?'atk':dl>0&&al===0?'def':'draw';
-
-  /* Survivants par typeId */
-  const atkSurv={}, defSurv={};
-  atk.filter(e=>e.hull>0).forEach(e=>{ atkSurv[e.typeId]=(atkSurv[e.typeId]||0)+1; });
-  def.filter(e=>e.hull>0).forEach(e=>{ defSurv[e.typeId]=(defSurv[e.typeId]||0)+1; });
-
-  /* Reconstruction défenses 70% avec roll individuel */
-  const defLossDetail={};
-  db.forEach(u=>{
-    const surv=defSurv[u.id]||0;
-    const destroyed=u.origCount-surv;
-    let rebuilt=0;
-    if(DEF_IDS.has(u.id)) for(let k=0;k<destroyed;k++) if(Math.random()<0.70) rebuilt++;
-    defLossDetail[u.id]={destroyed,rebuilt,permLost:destroyed-rebuilt,remaining:surv+rebuilt};
-  });
-
-  return{winner,log,atkSurv,defSurv,defLossDetail};
-}
-
-/* ─── Boucle principale du Worker ─── */
-self.onmessage=function(e){
-  const{ab,db,n}=e.data;
-  let aw=0,dw=0,dr=0,totRounds=0;
-
-  /* Accumulateurs survivants */
-  const atkSurvAcc={}, defSurvAcc={};
-  ab.forEach(u=>atkSurvAcc[u.id]=0);
-  db.forEach(u=>defSurvAcc[u.id]=0);
-
-  /* Distributions par unité */
-  const atkLossDist={}, defLossDist={};
-  ab.forEach(u=>atkLossDist[u.id]=[]);
-  db.forEach(u=>defLossDist[u.id]=[]);
-
-  const roundsDist=[];
-  let lastLog=[];
-
-  for(let i=0;i<n;i++){
-    const res=simulate(ab.map(u=>({...u})),db.map(u=>({...u})));
-    if(res.winner==='atk')aw++;
-    else if(res.winner==='def')dw++;
-    else dr++;
-    totRounds+=res.log.length;
-
-    ab.forEach(u=>{ const s=res.atkSurv[u.id]||0; atkSurvAcc[u.id]+=s; atkLossDist[u.id].push(u.origCount-s); });
-    db.forEach(u=>{
-      const d=res.defLossDetail[u.id]||{destroyed:0,rebuilt:0,permLost:0,remaining:u.origCount};
-      defSurvAcc[u.id]+=(res.defSurv[u.id]||0);
-      defLossDist[u.id].push(d);
-    });
-    roundsDist.push(res.log.length);
-    if(i===n-1) lastLog=res.log;
-
-    const progStep=Math.max(1,Math.floor(n/40));
-    if((i+1)%progStep===0||(i+1)===n) self.postMessage({type:'progress',done:i+1,total:n,aw,dw,dr});
-  }
-
-  self.postMessage({type:'done',aw,dw,dr,n,totRounds,
-    atkSurvAcc,defSurvAcc,lastLog,
-    atkLossDist,defLossDist,roundsDist,
-    ab,db
-  });
-};
-`;
-
 /* ─── LANCER LA SIMULATION ─── */
-let activeWorker = null;
 let simCount = 1000;
-let simEngine = 'api'; // 'api' | 'worker'
 let activeAbort = null;
 
-/* URL API : même origine si servi par Go, sinon localhost:8090, surcharge via ?api= */
+/* URL API : même origine si servi par Go, sinon localhost:9876, surcharge via ?api= */
 const API_BASE = (() => {
   const q = new URLSearchParams(location.search).get('api');
   if (q) return q.replace(/\/$/, '');
-  // Servi par le binaire Go (même host/port)
-  if (location.protocol.startsWith('http') && (location.port === '8765' || location.port === '8090' || location.port === '8080' || location.hostname.includes('onrender.com'))) {
-    return location.origin;
+  if (location.protocol.startsWith('http') && location.hostname !== '') {
+    // Même origine (Render, go run local, etc.)
+    if (location.port === '9876' || location.port === '8765' || location.port === '8090' || location.port === '8080' || location.hostname.includes('onrender.com') || location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
+      return location.origin;
+    }
   }
-  return 'http://127.0.0.1:8765';
+  return 'http://127.0.0.1:9876';
 })();
 
 const SIM_COUNT_HINTS = {10:'rapide — aperçu', 100:'équilibré', 1000:'statistiquement stable'};
@@ -968,16 +730,8 @@ function setSimCount(n){
   if(hint) hint.textContent=SIM_COUNT_HINTS[n]||'';
 }
 
-function setSimEngine(eng){
-  simEngine=eng;
-  document.querySelectorAll('#sim-engine-opts .sim-opt').forEach(b=>b.classList.toggle('on',b.dataset.engine===eng));
-  const hint=document.getElementById('sim-engine-hint');
-  if(hint) hint.textContent=eng==='api' ? ('API · '+API_BASE) : 'Web Worker navigateur';
-}
-
 function initApp(){
   try{
-    setSimEngine('api');
     restoreFromHash();
   }catch(e){
     console.error(e);
@@ -1002,20 +756,35 @@ function showLoading(n){
   el('prog-fill').style.width='0%';
   el('prog-done').textContent='0 / '+fmtSimCount(n);
   el('prog-pct').textContent='0%';
-  el('prog-live').textContent='Initialisation…';
+  el('prog-live').textContent='Connexion au serveur…';
+  const elapsedEl=el('prog-elapsed');
+  if(elapsedEl) elapsedEl.textContent='0.0 s';
 }
-function hideLoading(){ document.getElementById('loading').classList.remove('on'); }
+function hideLoading(){
+  document.getElementById('loading').classList.remove('on');
+  if(activeElapsedTimer){ clearInterval(activeElapsedTimer); activeElapsedTimer=null; }
+}
 function setProgress(done,total,aw,dw,dr){
   const el=id=>document.getElementById(id);
-  const pct=Math.round(done/total*100);
+  const pct=total?Math.round(done/total*100):0;
   el('prog-fill').style.width=pct+'%';
   el('prog-done').textContent=done+' / '+total;
   el('prog-pct').textContent=pct+'%';
   if(done>0) el('prog-live').textContent='ATK '+Math.round(aw/done*100)+'%  |  DEF '+Math.round(dw/done*100)+'%  |  Ég. '+Math.round(dr/done*100)+'%';
 }
 
+let activeElapsedTimer = null;
+function startElapsedClock(t0){
+  if(activeElapsedTimer) clearInterval(activeElapsedTimer);
+  const tick=()=>{
+    const el=document.getElementById('prog-elapsed');
+    if(el) el.textContent=((performance.now()-t0)/1000).toFixed(1)+' s';
+  };
+  tick();
+  activeElapsedTimer=setInterval(tick, 100);
+}
+
 function stopActiveSim(){
-  if(activeWorker){ activeWorker.terminate(); activeWorker=null; }
   if(activeAbort){ activeAbort.abort(); activeAbort=null; }
 }
 
@@ -1030,143 +799,98 @@ function runSim() {
 
   stopActiveSim();
   showLoading(simCount);
-  setTiming(simEngine==='api' ? 'Appel API Go…' : 'Worker JS…');
+  setTiming('Simulation API Go…');
 
   const t0 = performance.now();
-  const onDone = (d, label, serverMs) => {
+  runViaAPI(ab, db, simCount).then(({data, serverMs})=>{
     hideLoading();
     const clientMs = performance.now() - t0;
-    const parts = [label, fmtMs(clientMs)+' (client)'];
+    const parts = ['API Go', fmtMs(clientMs)+' (client)'];
     if(serverMs!=null) parts.push(fmtMs(serverMs)+' (serveur)');
     setTiming(parts.join(' · '), 'var(--green)');
-    renderResults(d, ab, db, totAtk, totDef);
-  };
-  const onErr = (err) => {
+    renderResults(data, ab, db, totAtk, totDef);
+  }).catch(err=>{
     hideLoading();
     console.error(err);
     setTiming('Erreur : '+(err.message||err), 'var(--red)');
     alert('Erreur simulation : '+(err.message||err));
-  };
-
-  if(simEngine==='api'){
-    runViaAPI(ab, db, simCount).then(({data, serverMs})=>onDone(data,'API Go',serverMs)).catch(onErr);
-  } else {
-    runViaWorker(ab, db, simCount).then(data=>onDone(data,'Worker JS',null)).catch(onErr);
-  }
+  });
 }
 
 async function runViaAPI(ab, db, n){
   activeAbort = new AbortController();
-  const prog = document.getElementById('prog-live');
-  if(prog) prog.textContent='Calcul côté serveur Go…';
-  // Fake progress while waiting (server has no SSE yet)
-  let fake=0;
-  const tick=setInterval(()=>{
-    fake=Math.min(n-1, fake+Math.max(1,Math.floor(n/30)));
-    setProgress(fake, n, 0, 0, 0);
-    const el=document.getElementById('prog-live');
-    if(el) el.textContent='Calcul côté serveur Go…';
-  }, 120);
+  const t0 = performance.now();
+  startElapsedClock(t0);
+  const live=document.getElementById('prog-live');
+  if(live) live.textContent='Calcul côté serveur Go… (progression réelle)';
 
   try{
-    const res = await fetch(API_BASE+'/simulate', {
+    const res = await fetch(API_BASE+'/simulate?stream=1', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'Accept':'application/x-ndjson',
+      },
       body: JSON.stringify({ab, db, n}),
       signal: activeAbort.signal,
     });
-    clearInterval(tick);
     if(!res.ok){
       const txt = await res.text();
       throw new Error(res.status+' '+txt);
     }
-    const serverMs = parseInt(res.headers.get('X-Sim-Duration-Ms')||'',10);
-    const data = await res.json();
-    setProgress(n, n, data.aw||0, data.dw||0, data.dr||0);
+
+    const ct = (res.headers.get('Content-Type')||'').toLowerCase();
+    // Fallback si un vieux serveur répond en JSON classique
+    if(ct.includes('application/json') && !ct.includes('ndjson')){
+      const serverMs = parseInt(res.headers.get('X-Sim-Duration-Ms')||'',10);
+      const data = await res.json();
+      setProgress(n, n, data.aw||0, data.dw||0, data.dr||0);
+      activeAbort = null;
+      return {data, serverMs: Number.isFinite(serverMs)?serverMs:(data.durationMs||null)};
+    }
+
+    if(!res.body) throw new Error('Réponse sans body (streaming impossible)');
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let finalData = null;
+
+    while(true){
+      const {value, done} = await reader.read();
+      if(done) break;
+      buf += decoder.decode(value, {stream:true});
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for(const line of lines){
+        const s = line.trim();
+        if(!s) continue;
+        let msg;
+        try { msg = JSON.parse(s); }
+        catch(e){ console.warn('ligne NDJSON invalide', s); continue; }
+        if(msg.type==='progress'){
+          setProgress(msg.done||0, msg.total||n, msg.aw||0, msg.dw||0, msg.dr||0);
+          const live2=document.getElementById('prog-live');
+          if(live2 && (msg.done||0)===0) live2.textContent='Serveur démarré — calcul en cours…';
+        } else if(msg.type==='done'){
+          finalData = msg;
+          setProgress(msg.n||n, msg.n||n, msg.aw||0, msg.dw||0, msg.dr||0);
+        }
+      }
+    }
+    if(buf.trim()){
+      try{
+        const msg=JSON.parse(buf.trim());
+        if(msg.type==='done') finalData=msg;
+        else if(msg.type==='progress') setProgress(msg.done||0,msg.total||n,msg.aw||0,msg.dw||0,msg.dr||0);
+      }catch(_){}
+    }
+
     activeAbort = null;
-    return {data, serverMs: Number.isFinite(serverMs)?serverMs:null};
+    if(!finalData) throw new Error('Connexion coupée avant la fin (timeout Render / mémoire). Réessaie avec moins de sims ou une flotte plus petite.');
+    return {data: finalData, serverMs: finalData.durationMs!=null?finalData.durationMs:null};
   } catch(e){
-    clearInterval(tick);
     activeAbort = null;
     throw e;
-  }
-}
-
-function runViaWorker(ab, db, n){
-  return new Promise((resolve, reject)=>{
-    const blob=new Blob([WORKER_SRC],{type:'application/javascript'});
-    const url=URL.createObjectURL(blob);
-    activeWorker=new Worker(url);
-    URL.revokeObjectURL(url);
-    activeWorker.onmessage=function(e){
-      const d=e.data;
-      if(d.type==='progress'){
-        setProgress(d.done,d.total,d.aw,d.dw,d.dr);
-        return;
-      }
-      if(d.type==='done'){
-        activeWorker=null;
-        resolve(d);
-      }
-    };
-    activeWorker.onerror=function(err){
-      activeWorker=null;
-      reject(err.message||err);
-    };
-    activeWorker.postMessage({ab,db,n});
-  });
-}
-
-/* Lance Go puis JS sur la même flotte, affiche temps + écarts de % */
-async function runCompare(){
-  const aw=gv('atk-weapons'), as_=gv('atk-shield'), aa=gv('atk-armor');
-  const dw=gv('def-weapons'), ds=gv('def-shield'),  da=gv('def-armor');
-  const ab=buildFleetData('atk',aw,as_,aa);
-  const db=buildFleetData('def',dw,ds,da);
-  const totAtk=ab.reduce((s,u)=>s+u.origCount,0);
-  const totDef=db.reduce((s,u)=>s+u.origCount,0);
-  if(!totAtk&&!totDef){ alert('Ajoutez des unités des deux côtés !'); return; }
-
-  stopActiveSim();
-  showLoading(simCount);
-  setTiming('Comparaison Go vs JS…');
-
-  try{
-    const tGo0 = performance.now();
-    document.getElementById('prog-live').textContent='1/2 — API Go…';
-    const {data: goData, serverMs} = await runViaAPI(ab, db, simCount);
-    const tGo = performance.now() - tGo0;
-
-    document.getElementById('prog-live').textContent='2/2 — Worker JS…';
-    showLoading(simCount);
-    const tJs0 = performance.now();
-    const jsData = await runViaWorker(ab, db, simCount);
-    const tJs = performance.now() - tJs0;
-
-    hideLoading();
-    // Affiche les résultats Go (source de vérité cible)
-    renderResults(goData, ab, db, totAtk, totDef);
-
-    const pct = (a,b,n)=>((a/n)*100).toFixed(1)+'% / '+((b/n)*100).toFixed(1)+'%';
-    const speedup = tJs > 0 ? (tJs/tGo).toFixed(1)+'×' : '—';
-    const delta = Math.abs(goData.aw-jsData.aw)+Math.abs(goData.dw-jsData.dw)+Math.abs(goData.dr-jsData.dr);
-    const deltaPct = (delta/simCount*100).toFixed(1);
-
-    setTiming(
-      'Go '+fmtMs(tGo)+(serverMs!=null?' (serveur '+fmtMs(serverMs)+')':'')
-      +'  vs  JS '+fmtMs(tJs)
-      +'  →  '+speedup+' plus rapide'
-      +'  |  ATK '+pct(goData.aw,jsData.aw,simCount)
-      +'  DEF '+pct(goData.dw,jsData.dw,simCount)
-      +'  Δ wins '+delta+' ('+deltaPct+' pts)',
-      delta/simCount < 0.05 ? 'var(--green)' : 'var(--yellow)'
-    );
-    console.log('[compare]', {go:{aw:goData.aw,dw:goData.dw,dr:goData.dr,ms:tGo,serverMs}, js:{aw:jsData.aw,dw:jsData.dw,dr:jsData.dr,ms:tJs}, delta, speedup});
-  } catch(err){
-    hideLoading();
-    console.error(err);
-    setTiming('Erreur comparaison : '+(err.message||err), 'var(--red)');
-    alert('Erreur comparaison : '+(err.message||err)+'\n\nLance le serveur : go run ./cmd/server');
   }
 }
 

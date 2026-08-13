@@ -14,5 +14,7 @@ COPY --from=build /solaris-api /app/solaris-api
 COPY index.html logo.png /app/
 ENV PORT=8080
 ENV STATIC_DIR=/app
+ENV MAX_WORKERS=2
+ENV GOMAXPROCS=2
 EXPOSE 8080
 CMD ["/app/solaris-api"]
