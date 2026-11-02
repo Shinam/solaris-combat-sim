@@ -477,6 +477,17 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;background:rgb
 </div>
 
 <script>
+// Remplacer une quantité en un appui, y compris dans les lignes générées.
+// Le clic resélectionne après le placement du curseur par le navigateur mobile.
+function selectNumericValue(event) {
+  const field = event.target;
+  if (field instanceof HTMLInputElement && field.type === 'number') {
+    field.select();
+  }
+}
+document.addEventListener('focusin', selectNumericValue);
+document.addEventListener('click', selectNumericValue);
+
 /* ═══════════════════════════════════════════════════════════
    SOLARIS COMBAT SIMULATOR
    Architecture :
